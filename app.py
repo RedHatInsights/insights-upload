@@ -61,9 +61,14 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             service, filename = split_content(self.request.headers['Content-type'])
             hash_value = uuid.uuid4().hex
-            with open('/datastore/' + service + '/' + hash_value, 'w') as f:
-                f.write(self.request.body)
-                file_dict[hash_value] = '/datastore/' + service + '/' + hash_value
+            try:
+                with open('/datastore/' + service + '/' + hash_value, 'w') as f:
+                    f.write(self.request.body)
+                    file_dict[hash_value] = '/datastore/' + service + '/' + hash_value
+            except IOError:
+                print('Service name does not exist: ' + service)
+                self.set_status(415, 'Unknown Service')
+                self.finish()
             self.set_status(202, 'Accepted')
             # once MQ is decided on, the service_notify function will go here
 
