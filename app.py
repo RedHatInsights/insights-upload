@@ -10,6 +10,8 @@ content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 max_length = os.getenv('MAX_LENGTH', 11010048)
 listen_port = os.getenv('LISTEN_PORT', 8888)
 
+# we need this to keep track of what hash values point to what files. Will
+# really need a better system for this. redis maybe?
 file_dict = {}
 
 # all storage below is local for testing. need to decide on a real object store
@@ -17,14 +19,14 @@ file_dict = {}
 
 def upload_validation(upload):
     if int(upload['Content-Length']) >= max_length:
-        code, msg = 413, 'Payload too large: ' + upload['Content-Length']
-        return code, msg
+        error = (413, 'Payload too large: ' + upload['Content-Length'])
+        return error
     if re.search(content_regex, upload['Content-type']) is None:
-        code, msg = 415, 'Unsupported Media Type'
-        return code, msg
+        error = (415, 'Unsupported Media Type')
+        return error
 
 
-class MainHandler(tornado.web.RequestHandler):
+class RootHandler(tornado.web.RequestHandler):
 
     def get(self):
         self.write("boop")
@@ -48,12 +50,13 @@ class UploadHandler(tornado.web.RequestHandler):
             filename = content_type.split('.')[-1].replace('+', '.')
             service = content_type.split('.')[2]
             hash_value = uuid.uuid4().hex
-            with open('/tmp/' + service + '/' + filename, 'w') as f:
+            with open('/tmp/' + service + '/' + hash_value, 'w') as f:
                 f.write(self.request.body)
-                file_dict[hash_value] = '/tmp/' + service + '/' + filename
+                file_dict[hash_value] = '/tmp/' + service + '/' + hash_value
             self.set_status(202, 'Accepted')
             # printing hash_value for testing. need to use for downloading file
             print(hash_value)
+            # need to figure out how to notify a service of a new upload
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
@@ -98,16 +101,24 @@ class StaticFileHandler(tornado.web.RequestHandler):
         self.write('booop placeholder')
 
 
-def make_app():
-    return tornado.web.Application([
-        (r"/", MainHandler),
-        (r"/v1/upload", UploadHandler),
-        (r"/v1/tmpstore/\w+", TmpFileHandler),
-        (r"/v1/store/\w+", StaticFileHandler)
-    ])
+class VersionHandler(tornado.web.RequestHandler):
+
+    def get(self):
+        response = {'version': '0.0.1'}
+        self.write(response)
+
+
+endpoints = [
+    (r"/", RootHandler),
+    (r"/api/v1/version", VersionHandler),
+    (r"/api/v1/upload", UploadHandler),
+    (r"/api/v1/tmpstore/\w{32}", TmpFileHandler),
+    (r"/api/v1/store/\w{32}", StaticFileHandler)
+]
+
+app = tornado.web.Application(endpoints)
 
 
 if __name__ == "__main__":
-    app = make_app()
     app.listen(listen_port)
     tornado.ioloop.IOLoop.current().start()
