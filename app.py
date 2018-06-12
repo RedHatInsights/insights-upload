@@ -84,7 +84,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
 
     def get(self):
         buf_size = 4096
-        with open(file_dict[self.request.uri.split('/')[3]], 'r') as f:
+        with open(file_dict[self.request.uri.split('/')[4]], 'r') as f:
             while True:
                 data = f.read(buf_size)
                 if not data:
@@ -95,8 +95,8 @@ class TmpFileHandler(tornado.web.RequestHandler):
         self.finish()
 
     def put(self):
-        new_path = "/tmp/new_dir/" + file_dict[self.request.uri.split('/')[3]].split('/')[-1]
-        os.rename(file_dict[self.request.uri.split('/')[3]], new_path)
+        new_path = "/tmp/new_dir/" + file_dict[self.request.uri.split('/')[4]].split('/')[-1]
+        os.rename(file_dict[self.request.uri.split('/')[4]], new_path)
         hash_value = uuid.uuid4().hex
         file_dict[hash_value] = new_path
         self.set_status(204, 'No Content')
@@ -104,8 +104,8 @@ class TmpFileHandler(tornado.web.RequestHandler):
 
     def delete(self):
         self.set_status(202, 'Accepted')
-        os.remove(file_dict[self.request.uri.split('/')[3]])
-        file_dict.pop(self.request.uri.split('/')[3], none)
+        os.remove(file_dict[self.request.uri.split('/')[4]])
+        file_dict.pop(self.request.uri.split('/')[4], none)
 
 
 class StaticFileHandler(tornado.web.RequestHandler):
