@@ -10,11 +10,12 @@ content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 max_length = os.getenv('MAX_LENGTH', 11010048)
 listen_port = os.getenv('LISTEN_PORT', 8888)
 
-# we need this to keep track of what hash values point to what files. Will
-# really need a better system for this. redis maybe?
+# we need this to keep track of what hash values point to what files. Going
+# to replace this with MQ when it's in place.
 file_dict = {}
 
 # all storage below is local for testing. need to decide on a real object store
+# - s3 for permanent, PVC for quarantine zone?
 
 
 def upload_validation(upload):
@@ -24,6 +25,18 @@ def upload_validation(upload):
     if re.search(content_regex, upload['Content-type']) is None:
         error = (415, 'Unsupported Media Type')
         return error
+
+
+def split_content(content):
+    service = content.split('.')[2]
+    filename = content.split('.')[-1]
+    return service, filename
+
+
+def service_notify(payload):
+    # Report the new upload to the proper message queue to be ingested by
+    # targeted service
+    return 'boop'
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -43,20 +56,16 @@ class UploadHandler(tornado.web.RequestHandler):
 
     def post(self):
         invalid = upload_validation(self.request.headers)
-        content_type = self.request.headers['Content-type']
         if invalid:
             self.set_status(invalid[0], invalid[1])
         else:
-            filename = content_type.split('.')[-1].replace('+', '.')
-            service = content_type.split('.')[2]
+            service, filename = split_content(self.request.headers['Content-type'])
             hash_value = uuid.uuid4().hex
-            with open('/tmp/' + service + '/' + hash_value, 'w') as f:
+            with open('/datastore/' + service + '/' + hash_value, 'w') as f:
                 f.write(self.request.body)
-                file_dict[hash_value] = '/tmp/' + service + '/' + hash_value
+                file_dict[hash_value] = '/datastore/' + service + '/' + hash_value
             self.set_status(202, 'Accepted')
-            # printing hash_value for testing. need to use for downloading file
-            print(hash_value)
-            # need to figure out how to notify a service of a new upload
+            # once MQ is decided on, the service_notify function will go here
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
