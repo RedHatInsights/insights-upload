@@ -4,6 +4,8 @@ import os
 import re
 import uuid
 
+from time import gmtime, strftime
+
 
 content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
@@ -72,7 +74,8 @@ class UploadHandler(tornado.web.RequestHandler):
                 print('Service name does not exist: ' + service)
                 self.set_status(415, 'Unknown Service')
                 self.finish()
-            status[hash_value] = {'upload_status': 'recieved'}
+            status[hash_value] = {'upload_status': 'recieved',
+                                  'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
             self.add_header('Status-Endpoint', '/api/v1/upload/status?id=' + hash_value)
             self.set_status(202, 'Accepted')
             # once MQ is decided on, the service_notify function will go here
@@ -112,6 +115,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
                     self.set_status(404)
                     break
                 status[self.hash_value]['upload_status'] = 'validating'
+                status[self.hash_value]['update_time'] = strftime("%Y%m%d-%H:%M:%S", gmtime())
                 self.set_status(200, 'OK')
                 self.write(data)
         self.finish()
@@ -121,11 +125,13 @@ class TmpFileHandler(tornado.web.RequestHandler):
         os.rename(file_dict[self.hash_value], new_path)
         file_dict[self.hash_value] = new_path
         status[self.hash_value]['upload_status'] = 'accepted'
+        status[self.hash_value]['update_time'] = strftime("%Y%m%d-%H:%M:%S", gmtime())
         self.set_status(204, 'No Content')
         self.add_header('Package-URI', "/v1/store/" + self.hash_value)
 
     def delete(self):
         status[self.hash_value]['upload_status'] = 'rejected'
+        status[self.hash_value]['update_time'] = strftime("%Y%m%d-%H:%M:%S", gmtime())
         self.set_status(202, 'Accepted')
         os.remove(file_dict[self.hash_value])
         file_dict.pop(self.hash_value, none)
