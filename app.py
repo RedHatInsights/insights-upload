@@ -12,8 +12,7 @@ content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 max_length = os.getenv('MAX_LENGTH', 11010048)
 listen_port = os.getenv('LISTEN_PORT', 8888)
 
-# we need this to keep track of what hash values point to what files. Going
-# to replace this with MQ when it's in place.
+# TODO: replace this with the MQ or some other key/value store
 file_dict = {}
 
 # TODO: create an actual persistent store for id status
@@ -21,6 +20,7 @@ status = {}
 
 # all storage below is local for testing. need to decide on a real object store
 # - s3 for permanent, PVC for quarantine zone?
+# TODO: decide on storage locations for quarantine and permanent
 
 
 def upload_validation(upload):
@@ -54,7 +54,8 @@ class RootHandler(tornado.web.RequestHandler):
 
 
 class UploadHandler(tornado.web.RequestHandler):
-    # accepts uploads. No auth implemented yet
+    # accepts uploads. No auth implemented yet, likely to be handled by 3scale
+    # anyway.
 
     def get(self):
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
@@ -141,6 +142,7 @@ class StaticFileHandler(tornado.web.RequestHandler):
     # Location for grabbing file from the long term storage
 
     def get(self):
+        # use the storage broker service to grab the file from S3
         self.write('booop placeholder')
 
 

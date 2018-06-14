@@ -22,4 +22,3 @@ class TestApp(tornado.testing.AsyncHTTPTestCase):
     def test_upload_options(self):
         response = self.fetch('/api/v1/upload', method='OPTIONS')
         self.assertEqual(response.headers['Allow'], 'GET, POST, HEAD, OPTIONS')
-
