@@ -4,6 +4,8 @@ import os
 import re
 import uuid
 
+from concurrent.futures import ThreadPoolExecutor
+from tornado.concurrent import run_on_executor
 from time import gmtime, strftime
 
 
@@ -11,6 +13,9 @@ content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
 max_length = os.getenv('MAX_LENGTH', 11010048)
 listen_port = os.getenv('LISTEN_PORT', 8888)
+
+# Maximum workers for threaded execution
+MAX_WORKERS = 4
 
 # TODO: replace this with the MQ or some other key/value store
 file_dict = {}
@@ -57,9 +62,18 @@ class UploadHandler(tornado.web.RequestHandler):
     # accepts uploads. No auth implemented yet, likely to be handled by 3scale
     # anyway.
 
+    executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+
     def get(self):
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
+    @run_on_executor
+    def write(path, data, hash_value):
+        with open(path, 'w') as f:
+            f.write(data)
+            file_dict[hash_value] = path
+
+    @tornado.gen.coroutine
     def post(self):
         invalid = upload_validation(self.request.headers)
         if invalid:
@@ -68,9 +82,9 @@ class UploadHandler(tornado.web.RequestHandler):
             service, filename = split_content(self.request.headers['Content-type'])
             hash_value = uuid.uuid4().hex
             try:
-                with open('/datastore/' + service + '/' + hash_value, 'w') as f:
-                    f.write(self.request.body)
-                    file_dict[hash_value] = '/datastore/' + service + '/' + hash_value
+                self.write('/datastore/' + service + '/' + hash_value,
+                           self.request.body,
+                           hash_value)
             except IOError:
                 print('Service name does not exist: ' + service)
                 self.set_status(415, 'Unknown Service')
