@@ -69,9 +69,14 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @run_on_executor
     def write(path, data, hash_value):
-        with open(path, 'w') as f:
-            f.write(data)
-            file_dict[hash_value] = path
+        try:
+            with open(path, 'w') as f:
+                f.write(data)
+                file_dict[hash_value] = path
+        except IOError:
+            print('Service name does not exist: ' + service)
+            self.set_status(415, 'Unknown Service')
+            self.finish()
 
     @tornado.gen.coroutine
     def post(self):
@@ -81,14 +86,9 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             service, filename = split_content(self.request.headers['Content-type'])
             hash_value = uuid.uuid4().hex
-            try:
-                self.write('/datastore/' + service + '/' + hash_value,
-                           self.request.body,
-                           hash_value)
-            except IOError:
-                print('Service name does not exist: ' + service)
-                self.set_status(415, 'Unknown Service')
-                self.finish()
+            result = yield self.write('/datastore/' + service + '/' + hash_value,
+                                      self.request.body,
+                                      hash_value)
             status[hash_value] = {'upload_status': 'recieved',
                                   'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
             self.add_header('Status-Endpoint', '/api/v1/upload/status?id=' + hash_value)
