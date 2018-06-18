@@ -4,6 +4,7 @@ import tornado.iostream
 import os
 import re
 import uuid
+import tempfile
 
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
@@ -71,13 +72,19 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @run_on_executor
     def write_data(self):
-        storage.upload_to_s3(self.request.body, 'insights-upload-quarantine', self.hash_value)
-        file_dict[self.hash_value] = self.path
+        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(self.request.body)
+            tmp.flush()
+        file_dict[self.hash_value] = tmp.name
         status[self.hash_value] = {'upload_status': 'received',
                                    'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
         response = {'header': ('Status-Enpoint', '/api/v1/upload/status?id=' + self.hash_value),
                     'status': (202, 'Accepted')}
         return response
+
+    @run_on_executor
+    def upload(self):
+        storage.upload_to_s3(file_dict[self.hash_value], 'insights-upload-quarantine', self.hash_value)
 
     @tornado.gen.coroutine
     def post(self):
@@ -87,11 +94,11 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             service, filename = split_content(self.request.headers['Content-type'])
             self.hash_value = uuid.uuid4().hex
-            self.path = '/datastore/' + service + '/' + self.hash_value
             result = yield self.write_data()
             self.set_status(result['status'][0], result['status'][1])
             self.set_header(result['header'][0], result['header'][1])
-            self.finish
+            self.finish()
+            self.upload()
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
