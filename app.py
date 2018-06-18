@@ -7,6 +7,7 @@ import uuid
 
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
+from utils import storage
 from time import gmtime, strftime
 
 
@@ -70,22 +71,13 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @run_on_executor
     def write_data(self):
-        try:
-            with open(self.path, 'w') as f:
-                f.write(str(self.request.body))
-                file_dict[self.hash_value] = self.path
-            status[self.hash_value] = {'upload_status': 'recieved',
-                                       'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
-            response = {'header': ('Status-Endpoint', '/api/v1/upload/status?id=' + self.hash_value),
-                        'status': (202, 'Accepted')}
-            return response
-            # once MQ is decided on, the service_notify function will go here
-
-        except IOError:
-            msg = 'Service name does not exist: ' + service
-            response = {'header': ('Failure', 'Service name does not exist: ' + service),
-                        'status': (415, 'Unknown Service')}
-            return response
+        storage.upload_to_s3(self.request.body, 'insights-upload-quarantine', self.hash_value)
+        file_dict[self.hash_value] = self.path
+        status[self.hash_value] = {'upload_status': 'received',
+                                   'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
+        response = {'header': ('Status-Enpoint', '/api/v1/upload/status?id=' + self.hash_value),
+                    'status': (202, 'Accepted')}
+        return response
 
     @tornado.gen.coroutine
     def post(self):
