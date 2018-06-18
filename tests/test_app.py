@@ -9,7 +9,7 @@ class TestApp(tornado.testing.AsyncHTTPTestCase):
     def test_root_get(self):
         response = self.fetch('/')
         self.assertEqual(response.code, 200)
-        self.assertEqual(response.body, 'boop')
+        self.assertEqual(response.body, b'boop')
 
     def test_root_options(self):
         response = self.fetch('/', method='OPTIONS')
@@ -17,7 +17,7 @@ class TestApp(tornado.testing.AsyncHTTPTestCase):
 
     def test_upload_get(self):
         response = self.fetch('/api/v1/upload')
-        self.assertEqual(response.body, 'Accepted Content-Types: gzipped tarfile, zip file')
+        self.assertEqual(response.body, b'Accepted Content-Types: gzipped tarfile, zip file')
 
     def test_upload_options(self):
         response = self.fetch('/api/v1/upload', method='OPTIONS')
