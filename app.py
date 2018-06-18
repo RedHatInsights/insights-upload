@@ -8,7 +8,7 @@ import tempfile
 
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
-from utils import storage
+from utils import storage, db
 from time import gmtime, strftime
 
 
@@ -25,10 +25,6 @@ file_dict = {}
 
 # TODO: create an actual persistent store for id status
 status = {}
-
-# all storage below is local for testing. need to decide on a real object store
-# - s3 for permanent, PVC for quarantine zone?
-# TODO: decide on storage locations for quarantine and permanent
 
 
 def upload_validation(upload):
@@ -185,5 +181,6 @@ app = tornado.web.Application(endpoints)
 
 
 if __name__ == "__main__":
+    db.createdb(str(db.db_path))
     app.listen(listen_port)
     tornado.ioloop.IOLoop.current().start()
