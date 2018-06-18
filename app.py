@@ -1,5 +1,6 @@
 import tornado.ioloop
 import tornado.web
+import tornado.iostream
 import os
 import re
 import uuid
@@ -15,7 +16,7 @@ max_length = os.getenv('MAX_LENGTH', 11010048)
 listen_port = os.getenv('LISTEN_PORT', 8888)
 
 # Maximum workers for threaded execution
-MAX_WORKERS = 4
+MAX_WORKERS = 10
 
 # TODO: replace this with the MQ or some other key/value store
 file_dict = {}
@@ -68,15 +69,23 @@ class UploadHandler(tornado.web.RequestHandler):
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
     @run_on_executor
-    def write(path, data, hash_value):
+    def write_data(self):
         try:
-            with open(path, 'w') as f:
-                f.write(data)
-                file_dict[hash_value] = path
+            with open(self.path, 'w') as f:
+                f.write(str(self.request.body))
+                file_dict[self.hash_value] = self.path
+            status[self.hash_value] = {'upload_status': 'recieved',
+                                       'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
+            response = {'header': ('Status-Endpoint', '/api/v1/upload/status?id=' + self.hash_value),
+                        'status': (202, 'Accepted')}
+            return response
+            # once MQ is decided on, the service_notify function will go here
+
         except IOError:
-            print('Service name does not exist: ' + service)
-            self.set_status(415, 'Unknown Service')
-            self.finish()
+            msg = 'Service name does not exist: ' + service
+            response = {'header': ('Failure', 'Service name does not exist: ' + service),
+                        'status': (415, 'Unknown Service')}
+            return response
 
     @tornado.gen.coroutine
     def post(self):
@@ -85,15 +94,12 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(invalid[0], invalid[1])
         else:
             service, filename = split_content(self.request.headers['Content-type'])
-            hash_value = uuid.uuid4().hex
-            result = yield self.write('/datastore/' + service + '/' + hash_value,
-                                      self.request.body,
-                                      hash_value)
-            status[hash_value] = {'upload_status': 'recieved',
-                                  'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
-            self.add_header('Status-Endpoint', '/api/v1/upload/status?id=' + hash_value)
-            self.set_status(202, 'Accepted')
-            # once MQ is decided on, the service_notify function will go here
+            self.hash_value = uuid.uuid4().hex
+            self.path = '/datastore/' + service + '/' + self.hash_value
+            result = yield self.write_data()
+            self.set_status(result['status'][0], result['status'][1])
+            self.set_header(result['header'][0], result['header'][1])
+            self.finish
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
