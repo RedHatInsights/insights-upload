@@ -1,16 +1,15 @@
 import tornado.ioloop
 import tornado.web
-import tornado.iostream
 import os
 import re
 import uuid
-import tempfile
 
+from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
-from utils import storage, db
 from time import gmtime, strftime
 
+from utils import storage, db
 
 content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
@@ -20,20 +19,13 @@ listen_port = os.getenv('LISTEN_PORT', 8888)
 # Maximum workers for threaded execution
 MAX_WORKERS = 10
 
-# TODO: replace this with the MQ or some other key/value store
-file_dict = {}
+# writing these values to sqlite for now
+# these are dummy values since we can't yet get a principle or rh_account
+values = {'principle': 'dumdum',
+          'rh_account': '123456'}
 
 # TODO: create an actual persistent store for id status
 status = {}
-
-
-def upload_validation(upload):
-    if int(upload['Content-Length']) >= max_length:
-        error = (413, 'Payload too large: ' + upload['Content-Length'])
-        return error
-    if re.search(content_regex, upload['Content-type']) is None:
-        error = (415, 'Unsupported Media Type')
-        return error
 
 
 def split_content(content):
@@ -63,38 +55,49 @@ class UploadHandler(tornado.web.RequestHandler):
 
     executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
+    def upload_validation(self):
+        if int(self.request.headers['Content-Length']) >= max_length:
+            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'])
+            return error
+        if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
+            error = (415, 'Unsupported Media Type')
+            return error
+
     def get(self):
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
     @run_on_executor
     def write_data(self):
-        with tempfile.NamedTemporaryFile(delete=False) as tmp:
-            tmp.write(self.request.body)
+        with NamedTemporaryFile(delete=False) as tmp:
+            tmp.write(self.request.files['upload'][0]['body'])
             tmp.flush()
-        file_dict[self.hash_value] = tmp.name
+            filename = tmp.name
         status[self.hash_value] = {'upload_status': 'received',
                                    'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
         response = {'header': ('Status-Enpoint', '/api/v1/upload/status?id=' + self.hash_value),
                     'status': (202, 'Accepted')}
-        return response
+        return response, filename
 
     @run_on_executor
-    def upload(self):
-        storage.upload_to_s3(file_dict[self.hash_value], 'insights-upload-quarantine', self.hash_value)
+    def upload(self, filename):
+        storage.upload_to_s3(filename, 'insights-upload-quarantine', self.hash_value)
 
     @tornado.gen.coroutine
     def post(self):
-        invalid = upload_validation(self.request.headers)
+        invalid = self.upload_validation()
         if invalid:
             self.set_status(invalid[0], invalid[1])
         else:
-            service, filename = split_content(self.request.headers['Content-type'])
+            service, filename = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
             result = yield self.write_data()
-            self.set_status(result['status'][0], result['status'][1])
-            self.set_header(result['header'][0], result['header'][1])
+            self.set_status(result[0]['status'][0], result[0]['status'][1])
+            self.set_header(result[0]['header'][0], result[0]['header'][1])
+            self.write(status[self.hash_value])
             self.finish()
-            self.upload()
+            self.upload(result[1])
+            values['hash'] = self.hash_value
+            db.write_to_db(values)
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
@@ -110,6 +113,7 @@ class UploadStatus(tornado.web.RequestHandler):
             self.set_status(400)
             return self.finish("Invalid ID")
         self.write(status[upload_id])
+        self.finish
 
 
 class TmpFileHandler(tornado.web.RequestHandler):
@@ -130,8 +134,9 @@ class TmpFileHandler(tornado.web.RequestHandler):
                 if not data:
                     self.set_status(404)
                     break
-                status[self.hash_value]['upload_status'] = 'validating'
-                status[self.hash_value]['update_time'] = strftime("%Y%m%d-%H:%M:%S", gmtime())
+                d = {'update_status': 'validating',
+                     'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
+                self.status['hash_value'].update(d)
                 self.set_status(200, 'OK')
                 self.write(data)
         self.finish()
@@ -140,14 +145,16 @@ class TmpFileHandler(tornado.web.RequestHandler):
         new_path = "/tmp/new_dir/" + file_dict[self.hash_value].split('/')[-1]
         os.rename(file_dict[self.hash_value], new_path)
         file_dict[self.hash_value] = new_path
-        status[self.hash_value]['upload_status'] = 'accepted'
-        status[self.hash_value]['update_time'] = strftime("%Y%m%d-%H:%M:%S", gmtime())
+        d = {'update_status': 'accepted',
+             'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
+        status[self.hash_value].update(d)
         self.set_status(204, 'No Content')
         self.add_header('Package-URI', "/v1/store/" + self.hash_value)
 
     def delete(self):
-        status[self.hash_value]['upload_status'] = 'rejected'
-        status[self.hash_value]['update_time'] = strftime("%Y%m%d-%H:%M:%S", gmtime())
+        d = {'update_status': 'rejected',
+             'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
+        status[self.hash_value].update(d)
         self.set_status(202, 'Accepted')
         os.remove(file_dict[self.hash_value])
         file_dict.pop(self.hash_value, none)

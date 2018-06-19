@@ -17,7 +17,7 @@ def createdb(path):
         c = conn.cursor()
 
         c.execute('''CREATE TABLE uploads
-                  (id integer primary key not null,
+                  (id integer primary key autoincrement,
                    hash varchar(34) not null,
                    principle varchar(30) not null,
                    rh_account int(20) not null)''')
@@ -36,8 +36,8 @@ def create_connection(path):
 
 
 def write_to_db(vals):
-    conn = create_connection(db_path)
+    conn = create_connection("/datastore/uploader.db")
     cursor = conn.cursor()
-    c.execute("INSERT INTO uploads VALUES (%s, %s, %s, %s)" % format(**vals))
+    cursor.execute("INSERT INTO uploads (hash, principle, rh_account) VALUES ('{hash}', '{principle}', '{rh_account}')".format(**vals))
     conn.commit()
     conn.close()
