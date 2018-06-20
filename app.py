@@ -139,7 +139,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
         hash_value = self.request.uri.split('/')[4]
         filename = self.read_data(hash_value)
         buf_size = 4096
-        with open(filename, 'r') as f:
+        with open(filename, 'rb') as f:
             while True:
                 data = f.read(buf_size)
                 if not data:
