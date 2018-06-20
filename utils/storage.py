@@ -13,6 +13,21 @@ def upload_to_s3(data, bucket_name, key):
     s3.upload_file(data, bucket_name, key)
 
 
+def read_from_s3(bucket_name, key, filename):
+    s3.download_file(bucket_name, key, filename)
+
+
+def transfer(key, source_bucket, dest_bucket):
+    copy_src = {'Bucket': source_bucket,
+                'Key': key}
+    s3.copy(copy_src, dest_bucket, copy_src['Key'])
+    s3.delete_object(Bucket=source_bucket, Key=key)
+
+
+def delete_object(key, bucket_name):
+    s3.delete_object(Bucket=bucket_name, Key=key)
+
+
 # placeholder since we might need this and i don't want to forget
 def upload_to_azure():
     pass

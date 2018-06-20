@@ -24,8 +24,10 @@ MAX_WORKERS = 10
 values = {'principle': 'dumdum',
           'rh_account': '123456'}
 
-# TODO: create an actual persistent store for id status
-status = {}
+
+# S3 buckets
+quarantine = 'insights-upload-quarantine'
+perm = 'insights-upload-perm-test'
 
 
 def split_content(content):
@@ -72,15 +74,15 @@ class UploadHandler(tornado.web.RequestHandler):
             tmp.write(self.request.files['upload'][0]['body'])
             tmp.flush()
             filename = tmp.name
-        status[self.hash_value] = {'upload_status': 'received',
-                                   'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
+        values['status'] = 'received'
         response = {'header': ('Status-Enpoint', '/api/v1/upload/status?id=' + self.hash_value),
                     'status': (202, 'Accepted')}
         return response, filename
 
     @run_on_executor
     def upload(self, filename):
-        storage.upload_to_s3(filename, 'insights-upload-quarantine', self.hash_value)
+        storage.upload_to_s3(filename, quarantine, self.hash_value)
+        os.remove(filename)
 
     @tornado.gen.coroutine
     def post(self):
@@ -91,12 +93,12 @@ class UploadHandler(tornado.web.RequestHandler):
             service, filename = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
             result = yield self.write_data()
+            values['hash'] = self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
-            self.write(status[self.hash_value])
+            self.write(values)
             self.finish()
             self.upload(result[1])
-            values['hash'] = self.hash_value
             db.write_to_db(values)
 
     def options(self):
@@ -112,7 +114,9 @@ class UploadStatus(tornado.web.RequestHandler):
         if upload_id == []:
             self.set_status(400)
             return self.finish("Invalid ID")
-        self.write(status[upload_id])
+        response = db.upload_status(upload_id)
+        result = {'status': str(response[0]), 'time': str(response[1])}
+        self.write(result)
         self.finish
 
 
@@ -122,42 +126,43 @@ class TmpFileHandler(tornado.web.RequestHandler):
     # remove it. If approved, it moves to a more permanent location with a
     # new URI
 
-    def __init__(self):
+    executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
-        self.hash_value = self.request.uri.split('/')[4]
+    def read_data(self, hash_value):
+        with NamedTemporaryFile(delete=False) as tmp:
+            filename = tmp.name
+            storage.read_from_s3(quarantine, hash_value, filename)
+            tmp.flush()
+        return filename
 
     def get(self):
+        hash_value = self.request.uri.split('/')[4]
+        filename = self.read_data(hash_value)
         buf_size = 4096
-        with open(file_dict[self.hash_value], 'r') as f:
+        with open(filename, 'r') as f:
             while True:
                 data = f.read(buf_size)
                 if not data:
                     self.set_status(404)
                     break
-                d = {'update_status': 'validating',
-                     'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
-                self.status['hash_value'].update(d)
-                self.set_status(200, 'OK')
-                self.write(data)
+                else:
+                    self.set_status(200)
+                    self.write(data)
+        db.update_status(hash_value, 'validating')
         self.finish()
 
     def put(self):
-        new_path = "/tmp/new_dir/" + file_dict[self.hash_value].split('/')[-1]
-        os.rename(file_dict[self.hash_value], new_path)
-        file_dict[self.hash_value] = new_path
-        d = {'update_status': 'accepted',
-             'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
-        status[self.hash_value].update(d)
+        hash_value = self.request.uri.split('/')[4]
+        storage.transfer(hash_value, quarantine, perm)
+        db.update_status(hash_value, 'accepted')
         self.set_status(204, 'No Content')
-        self.add_header('Package-URI', "/v1/store/" + self.hash_value)
+        self.add_header('Package-URI', "insights-upload-perm-test S3 Bucket: " + hash_value)
 
     def delete(self):
-        d = {'update_status': 'rejected',
-             'update_time': strftime("%Y%m%d-%H:%M:%S", gmtime())}
-        status[self.hash_value].update(d)
+        hash_value = self.request.uri.split('/')[4]
+        storage.delete_object(hash_value, quarantine)
+        db.update_status(hash_value, 'rejected')
         self.set_status(202, 'Accepted')
-        os.remove(file_dict[self.hash_value])
-        file_dict.pop(self.hash_value, none)
 
 
 class StaticFileHandler(tornado.web.RequestHandler):

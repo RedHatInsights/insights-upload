@@ -20,7 +20,9 @@ def createdb(path):
                   (id integer primary key autoincrement,
                    hash varchar(34) not null,
                    principle varchar(30) not null,
-                   rh_account int(20) not null)''')
+                   rh_account int(20) not null,
+                   status varchar(20) not null,
+                   time datetime default current_timestamp not null)''')
 
         conn.commit()
 
@@ -38,6 +40,24 @@ def create_connection(path):
 def write_to_db(vals):
     conn = create_connection("/datastore/uploader.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT INTO uploads (hash, principle, rh_account) VALUES ('{hash}', '{principle}', '{rh_account}')".format(**vals))
+    cursor.execute("INSERT INTO uploads (hash, principle, rh_account, status) VALUES ('{hash}', '{principle}', '{rh_account}', '{status}')".format(**vals))
     conn.commit()
     conn.close()
+
+
+def update_status(hash_, status):
+    conn = create_connection("/datastore/uploader.db")
+    cursor = conn.cursor()
+    cursor.execute("UPDATE uploads SET status='%s' WHERE hash='%s'" % (status, hash_))
+    conn.commit()
+    conn.close()
+
+def upload_status(hash_):
+    conn = create_connection("/datastore/uploader.db")
+    cursor = conn.cursor()
+    response = cursor.execute("SELECT status, time FROM uploads WHERE hash='%s'" % hash_).fetchone()
+    conn.close()
+    if response:
+        return response
+    else:
+        return 'Unique id does not exist'
