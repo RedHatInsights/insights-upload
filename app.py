@@ -3,11 +3,13 @@ import tornado.web
 import os
 import re
 import uuid
+import json
 
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
 from time import gmtime, strftime
+from confluent_kafka import Producer
 
 from utils import storage, db
 
@@ -23,6 +25,8 @@ MAX_WORKERS = 10
 # these are dummy values since we can't yet get a principle or rh_account
 values = {'principle': 'dumdum',
           'rh_account': '123456'}
+
+mq = Producer({'bootstrap.servers': 'kafka.cmitchel-msgq-test.svc:29092'})
 
 
 # S3 buckets
@@ -40,6 +44,13 @@ def service_notify(payload):
     # Report the new upload to the proper message queue to be ingested by
     # targeted service
     return 'boop'
+
+
+def deliver_report(err, msg):
+    if err is not None:
+        print('Message delivery failed: {}'.format(err))
+    else:
+        print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -94,12 +105,15 @@ class UploadHandler(tornado.web.RequestHandler):
             self.hash_value = uuid.uuid4().hex
             result = yield self.write_data()
             values['hash'] = self.hash_value
+            values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/upload/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
             self.write(values)
             self.finish()
             self.upload(result[1])
             db.write_to_db(values)
+            p.produce(service, json.dumps(values), callback=delivery_report)
+
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
@@ -126,7 +140,6 @@ class TmpFileHandler(tornado.web.RequestHandler):
     # remove it. If approved, it moves to a more permanent location with a
     # new URI
 
-    executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
@@ -168,9 +181,33 @@ class TmpFileHandler(tornado.web.RequestHandler):
 class StaticFileHandler(tornado.web.RequestHandler):
     # Location for grabbing file from the long term storage
 
+    def read_data(self, hash_value):
+        with NamedTemporaryFile(delete=False) as tmp:
+            filename = tmp.name
+            storage.read_from_s3(perm, hash_value, filename)
+            tmp.flush()
+        return filename
+
     def get(self):
         # use the storage broker service to grab the file from S3
-        self.write('booop placeholder')
+        hash_value = self.request.uri.split('/')[4]
+        filename = self.read_data(hash_value)
+        buf_size = 4096
+        with open(filename, 'rb') as f:
+            while True:
+                data = f.read(buf_size)
+                if not data:
+                    self.set_status(404)
+                    break
+                else:
+                    self.set_status(200)
+                    self.write(data)
+        self.finish()
+
+    def delete(self):
+        hash_value = self.request.uri.split('/')[4]
+        storage.delete_object(hash_value, perm)
+        self.set_status(202, 'Accepted')
 
 
 class VersionHandler(tornado.web.RequestHandler):
