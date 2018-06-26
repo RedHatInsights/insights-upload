@@ -46,7 +46,7 @@ def service_notify(payload):
     return 'boop'
 
 
-def deliver_report(err, msg):
+def delivery_report(err, msg):
     if err is not None:
         print('Message delivery failed: {}'.format(err))
     else:
