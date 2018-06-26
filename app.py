@@ -112,7 +112,8 @@ class UploadHandler(tornado.web.RequestHandler):
             self.finish()
             self.upload(result[1])
             db.write_to_db(values)
-            p.produce(service, json.dumps(values), callback=delivery_report)
+            mq.poll(0)
+            mq.produce(service, json.dumps(values), callback=delivery_report)
 
 
     def options(self):
