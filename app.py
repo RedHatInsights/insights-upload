@@ -70,7 +70,7 @@ class UploadHandler(tornado.web.RequestHandler):
 
     def upload_validation(self):
         if int(self.request.headers['Content-Length']) >= max_length:
-            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'])
+            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + max_length + ' bytes')
             return error
         if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
             error = (415, 'Unsupported Media Type')
@@ -108,13 +108,11 @@ class UploadHandler(tornado.web.RequestHandler):
             values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/upload/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
-            self.write(values)
             self.finish()
             self.upload(result[1])
             db.write_to_db(values)
             mq.poll(0)
             mq.produce(service, json.dumps(values), callback=delivery_report)
-
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
@@ -140,7 +138,6 @@ class TmpFileHandler(tornado.web.RequestHandler):
     # they send an empty PUT request to approve it or a DELETE request to
     # remove it. If approved, it moves to a more permanent location with a
     # new URI
-
 
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
@@ -170,13 +167,17 @@ class TmpFileHandler(tornado.web.RequestHandler):
         storage.transfer(hash_value, quarantine, perm)
         db.update_status(hash_value, 'accepted')
         self.set_status(204, 'No Content')
-        self.add_header('Package-URI', "insights-upload-perm-test S3 Bucket: " + hash_value)
+        self.add_header('Location', "http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/" + hash_value)
+        json = json.dumps({'permanent_url': 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/' + hash_value})
+        self.write(json)
+        self.finish()
 
     def delete(self):
         hash_value = self.request.uri.split('/')[4]
         storage.delete_object(hash_value, quarantine)
         db.update_status(hash_value, 'rejected')
         self.set_status(202, 'Accepted')
+        self.finish()
 
 
 class StaticFileHandler(tornado.web.RequestHandler):
