@@ -9,9 +9,9 @@ from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
 from time import gmtime, strftime
-from confluent_kafka import Producer
+from kiel import clients
 
-from utils import storage, db
+from utils import storage
 
 content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
@@ -26,8 +26,6 @@ MAX_WORKERS = 10
 values = {'principle': 'dumdum',
           'rh_account': '123456'}
 
-mq = Producer({'bootstrap.servers': 'kafka.cmitchel-msgq-test.svc:29092'})
-
 
 # S3 buckets
 quarantine = 'insights-upload-quarantine'
@@ -40,18 +38,31 @@ def split_content(content):
     return service, filename
 
 
-def service_notify(payload):
-    # Report the new upload to the proper message queue to be ingested by
-    # targeted service
-    return 'boop'
-
-
 def delivery_report(err, msg):
     if err is not None:
         print('Message delivery failed: {}'.format(err))
     else:
         print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
 
+
+@tornado.gen.coroutine
+def consume():
+
+    mqc = clients.Consumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
+    yield mqc.connect()
+
+    while True:
+        msgs = yield c.consume('uploadvalidation')
+        for msg in msgs:
+            print(msg)
+
+
+@tornado.gen.coroutine
+def produce(topic, msg):
+
+    mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
+    yield mqp.connect()
+    yield mqp.produce(topic, json.loads(msg))
 
 class RootHandler(tornado.web.RequestHandler):
 
@@ -85,7 +96,6 @@ class UploadHandler(tornado.web.RequestHandler):
             tmp.write(self.request.files['upload'][0]['body'])
             tmp.flush()
             filename = tmp.name
-        values['status'] = 'received'
         response = {'header': ('Status-Enpoint', '/api/v1/upload/status?id=' + self.hash_value),
                     'status': (202, 'Accepted')}
         return response, filename
@@ -110,27 +120,10 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_header(result[0]['header'][0], result[0]['header'][1])
             self.finish()
             self.upload(result[1])
-            db.write_to_db(values)
-            mq.poll(0)
-            mq.produce(service, json.dumps(values), callback=delivery_report)
+            produce(service, values)
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
-
-
-class UploadStatus(tornado.web.RequestHandler):
-    # endpoint for getting information on an individual upload.
-    # Was upload rejected or eccepted by service
-
-    def get(self):
-        upload_id = self.get_argument('id')
-        if upload_id == []:
-            self.set_status(400)
-            return self.finish("Invalid ID")
-        response = db.upload_status(upload_id)
-        result = {'status': str(response[0]), 'time': str(response[1])}
-        self.write(result)
-        self.finish
 
 
 class TmpFileHandler(tornado.web.RequestHandler):
@@ -159,13 +152,11 @@ class TmpFileHandler(tornado.web.RequestHandler):
                 else:
                     self.set_status(200)
                     self.write(data)
-        db.update_status(hash_value, 'validating')
         self.finish()
 
     def put(self):
         hash_value = self.request.uri.split('/')[4]
         storage.transfer(hash_value, quarantine, perm)
-        db.update_status(hash_value, 'accepted')
         self.set_status(204, 'No Content')
         self.add_header('Location', "http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/" + hash_value)
         self.finish()
@@ -173,7 +164,6 @@ class TmpFileHandler(tornado.web.RequestHandler):
     def delete(self):
         hash_value = self.request.uri.split('/')[4]
         storage.delete_object(hash_value, quarantine)
-        db.update_status(hash_value, 'rejected')
         self.set_status(202, 'Accepted')
         self.finish()
 
@@ -221,7 +211,6 @@ endpoints = [
     (r"/", RootHandler),
     (r"/api/v1/version", VersionHandler),
     (r"/api/v1/upload", UploadHandler),
-    (r"/api/v1/upload/status", UploadStatus),
     (r"/api/v1/tmpstore/\w{32}", TmpFileHandler),
     (r"/api/v1/store/\w{32}", StaticFileHandler)
 ]
@@ -232,4 +221,9 @@ app = tornado.web.Application(endpoints)
 if __name__ == "__main__":
     db.createdb(str(db.db_path))
     app.listen(listen_port)
-    tornado.ioloop.IOLoop.current().start()
+    loop = tornado.ioloop.IOLoop.current()
+    loop.add_callback(consume)
+    try:
+        loop.start()
+    except KeyboardInterrupt:
+        loop.stop()
