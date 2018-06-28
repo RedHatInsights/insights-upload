@@ -105,7 +105,7 @@ class UploadHandler(tornado.web.RequestHandler):
             self.hash_value = uuid.uuid4().hex
             result = yield self.write_data()
             values['hash'] = self.hash_value
-            values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/upload/tmpstore/' + self.hash_value
+            values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
             self.finish()
@@ -168,8 +168,8 @@ class TmpFileHandler(tornado.web.RequestHandler):
         db.update_status(hash_value, 'accepted')
         self.set_status(204, 'No Content')
         self.add_header('Location', "http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/" + hash_value)
-        json = json.dumps({'permanent_url': 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/' + hash_value})
-        self.write(json)
+        data = json.dumps({'permanent_url': 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/' + hash_value})
+        self.write(data)
         self.finish()
 
     def delete(self):
