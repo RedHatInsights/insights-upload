@@ -168,8 +168,6 @@ class TmpFileHandler(tornado.web.RequestHandler):
         db.update_status(hash_value, 'accepted')
         self.set_status(204, 'No Content')
         self.add_header('Location', "http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/" + hash_value)
-        data = json.dumps({'permanent_url': 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/' + hash_value})
-        self.write(data)
         self.finish()
 
     def delete(self):
