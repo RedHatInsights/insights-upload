@@ -38,7 +38,6 @@ perm = 'insights-upload-perm-test'
 
 
 # message queues
-mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
 mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
 
 def split_content(content):
@@ -56,6 +55,8 @@ def delivery_report(err, msg):
 
 @tornado.gen.coroutine
 def consume():
+    mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
+    mqc.connect()
 
     while True:
         msgs = yield mqc.consume('uploadvalidation')
@@ -225,7 +226,6 @@ app = tornado.web.Application(endpoints)
 if __name__ == "__main__":
     app.listen(listen_port)
     mqp.connect()
-    mqc.connect()
     loop = tornado.ioloop.IOLoop.current()
     loop.add_callback(consume)
     try:
