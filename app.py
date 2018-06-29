@@ -16,7 +16,7 @@ from utils import storage
 
 # Logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+logger = logging.getLogger('upload-service')
 
 content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
@@ -121,22 +121,16 @@ class UploadHandler(tornado.web.RequestHandler):
         logger.info('post')
         invalid = self.upload_validation()
         if invalid:
-            logger.info('invalid payload')
             self.set_status(invalid[0], invalid[1])
         else:
-            logger.info('payload valid')
             service, filename = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
-            logger.info('pre-coroutine')
             result = yield self.write_data()
-            logger.info('we did it. yay')
             values['hash'] = self.hash_value
             values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
             self.finish()
-            logger.info(values)
-            logger.info(result)
             self.upload(result[1])
             self.produce(service, values)
 
@@ -239,7 +233,7 @@ app = tornado.web.Application(endpoints)
 if __name__ == "__main__":
     app.listen(listen_port)
     loop = tornado.ioloop.IOLoop.current()
-    loop.spawn_callback(consume)
+    loop.add_callback(consume)
     try:
         loop.start()
     except KeyboardInterrupt:
