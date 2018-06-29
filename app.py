@@ -239,7 +239,7 @@ app = tornado.web.Application(endpoints)
 if __name__ == "__main__":
     app.listen(listen_port)
     loop = tornado.ioloop.IOLoop.current()
-    loop.add_callback(consume)
+    loop.spawn_callback(consume)
     try:
         loop.start()
     except KeyboardInterrupt:
