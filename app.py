@@ -96,12 +96,6 @@ class UploadHandler(tornado.web.RequestHandler):
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
     @run_on_executor
-    def produce(topic, msg):
-        mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
-        yield mqp.connect()
-        yield mqp.produce(topic, json.loads(msg))
-
-    @run_on_executor
     def write_data(self):
         with NamedTemporaryFile(delete=False) as tmp:
             tmp.write(self.request.files['upload'][0]['body'])
@@ -132,7 +126,7 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_header(result[0]['header'][0], result[0]['header'][1])
             self.finish()
             self.upload(result[1])
-            self.produce(service, values)
+            produce(service, values)
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
