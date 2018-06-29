@@ -67,7 +67,7 @@ def produce(topic, msg):
 
     mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
     yield mqp.connect()
-    yield mqp.produce(topic, json.loads(msg))
+    yield mqp.produce(topic, json.dumps(msg))
 
 class RootHandler(tornado.web.RequestHandler):
 
