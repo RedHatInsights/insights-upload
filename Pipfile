@@ -8,7 +8,7 @@ name = "pypi"
 [packages]
 tornado = "*"
 "boto3" = "*"
-confluent-kafka = "*"
+kiel = "*"
 
 [requires]
 python_version = "3.6"
