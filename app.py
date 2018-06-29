@@ -58,9 +58,10 @@ def delivery_report(err, msg):
 def consume():
     yield mqc.connect()
 
-    msgs = yield mqc.consume('uploadvalidation')
-    for msg in msgs:
-        logger.info(msg)
+    while True:
+        msgs = yield mqc.consume('uploadvalidation')
+        for msg in msgs:
+            logger.info(msg)
 
 
 @tornado.gen.coroutine
