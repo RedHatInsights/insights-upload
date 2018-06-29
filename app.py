@@ -4,6 +4,7 @@ import os
 import re
 import uuid
 import json
+import logging
 
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
@@ -12,6 +13,10 @@ from time import gmtime, strftime
 from kiel import clients
 
 from utils import storage
+
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
@@ -40,9 +45,9 @@ def split_content(content):
 
 def delivery_report(err, msg):
     if err is not None:
-        print('Message delivery failed: {}'.format(err))
+        logger.info('Message delivery failed: {}'.format(err))
     else:
-        print('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+        logger.info('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
 
 
 @tornado.gen.coroutine
@@ -54,7 +59,7 @@ def consume():
     while True:
         msgs = yield mqc.consume('uploadvalidation')
         for msg in msgs:
-            print(msg)
+            logger.info(msg)
 
 
 @tornado.gen.coroutine
@@ -91,6 +96,12 @@ class UploadHandler(tornado.web.RequestHandler):
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
     @run_on_executor
+    def produce(topic, msg):
+        mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
+        yield mqp.connect()
+        yield mqp.produce(topic, json.loads(msg))
+
+    @run_on_executor
     def write_data(self):
         with NamedTemporaryFile(delete=False) as tmp:
             tmp.write(self.request.files['upload'][0]['body'])
@@ -107,27 +118,27 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @tornado.gen.coroutine
     def post(self):
-        print('post is getting hit')
+        logger.info('post')
         invalid = self.upload_validation()
         if invalid:
-            print('payload invalid')
+            logger.info('invalid payload')
             self.set_status(invalid[0], invalid[1])
         else:
-            print('payload valid')
+            logger.info('payload valid')
             service, filename = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
-            print('pre-coroutine')
+            logger.info('pre-coroutine')
             result = yield self.write_data()
-            print('we did it. yay')
+            logger.info('we did it. yay')
             values['hash'] = self.hash_value
             values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
             self.finish()
-            print(values)
-            print(result)
+            logger.info(values)
+            logger.info(result)
             self.upload(result[1])
-            produce(service, values)
+            self.produce(service, values)
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
