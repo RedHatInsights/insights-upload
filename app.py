@@ -37,6 +37,10 @@ quarantine = 'insights-upload-quarantine'
 perm = 'insights-upload-perm-test'
 
 
+# message queues
+mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
+mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
+
 def split_content(content):
     service = content.split('.')[2]
     filename = content.split('.')[-1]
@@ -53,9 +57,6 @@ def delivery_report(err, msg):
 @tornado.gen.coroutine
 def consume():
 
-    mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
-    yield mqc.connect()
-
     while True:
         msgs = yield mqc.consume('uploadvalidation')
         for msg in msgs:
@@ -64,9 +65,6 @@ def consume():
 
 @tornado.gen.coroutine
 def produce(topic, msg):
-
-    mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
-    yield mqp.connect()
     yield mqp.produce(topic, json.dumps(msg))
 
 class RootHandler(tornado.web.RequestHandler):
@@ -226,6 +224,8 @@ app = tornado.web.Application(endpoints)
 
 if __name__ == "__main__":
     app.listen(listen_port)
+    mqp.connect()
+    mqc.connect()
     loop = tornado.ioloop.IOLoop.current()
     loop.add_callback(consume)
     try:
