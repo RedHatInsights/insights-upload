@@ -107,10 +107,13 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @tornado.gen.coroutine
     def post(self):
+        print('post is getting hit')
         invalid = self.upload_validation()
         if invalid:
+            print('payload invalid')
             self.set_status(invalid[0], invalid[1])
         else:
+            print('payload valid')
             service, filename = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
             print('pre-coroutine')
@@ -120,9 +123,9 @@ class UploadHandler(tornado.web.RequestHandler):
             values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
+            self.finish()
             print(values)
             print(result)
-            self.finish()
             self.upload(result[1])
             produce(service, values)
 
