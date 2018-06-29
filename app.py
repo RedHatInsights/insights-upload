@@ -113,11 +113,15 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             service, filename = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
+            print('pre-coroutine')
             result = yield self.write_data()
+            print('we did it. yay')
             values['hash'] = self.hash_value
             values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.set_header(result[0]['header'][0], result[0]['header'][1])
+            print(values)
+            print(result)
             self.finish()
             self.upload(result[1])
             produce(service, values)
