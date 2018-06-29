@@ -41,6 +41,7 @@ perm = 'insights-upload-perm-test'
 mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
 mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
 
+
 def split_content(content):
     service = content.split('.')[2]
     filename = content.split('.')[-1]
@@ -60,13 +61,30 @@ def consume():
 
     while True:
         msgs = yield mqc.consume('uploadvalidation')
+        if msgs:
+            handle_file(msgs)
+
         for msg in msgs:
             logger.info(msg)
 
 
 @tornado.gen.coroutine
+def handle_file(msgs):
+
+    for msg in msgs:
+        hash_ = msg['hash']
+        result = msg['validation']
+
+        if result is 'success':
+            storage.transfer(hash_, quarantine, perm)
+        if result is 'failure':
+            storage.delete_object(hash_, quarantine)
+
+
+@tornado.gen.coroutine
 def produce(topic, msg):
     yield mqp.produce(topic, json.dumps(msg))
+
 
 class RootHandler(tornado.web.RequestHandler):
 
@@ -157,19 +175,6 @@ class TmpFileHandler(tornado.web.RequestHandler):
                 else:
                     self.set_status(200)
                     self.write(data)
-        self.finish()
-
-    def put(self):
-        hash_value = self.request.uri.split('/')[4]
-        storage.transfer(hash_value, quarantine, perm)
-        self.set_status(204, 'No Content')
-        self.add_header('Location', "http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/" + hash_value)
-        self.finish()
-
-    def delete(self):
-        hash_value = self.request.uri.split('/')[4]
-        storage.delete_object(hash_value, quarantine)
-        self.set_status(202, 'Accepted')
         self.finish()
 
 
