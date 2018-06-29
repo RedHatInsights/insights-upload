@@ -68,6 +68,8 @@ def consume():
 @tornado.gen.coroutine
 def handle_file(msgs):
 
+    logger.info('handling file: ' + msgs[1]['hash'])
+
     for msg in msgs:
         hash_ = msg['hash']
         result = msg['validation']
