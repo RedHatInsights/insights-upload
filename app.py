@@ -64,9 +64,6 @@ def consume():
         if msgs:
             handle_file(msgs)
 
-        for msg in msgs:
-            logger.info(msg)
-
 
 @tornado.gen.coroutine
 def handle_file(msgs):
@@ -78,6 +75,7 @@ def handle_file(msgs):
         if result is 'success':
             storage.transfer(hash_, quarantine, perm)
         if result is 'failure':
+            logger.info(hash_ + ' rejected')
             storage.delete_object(hash_, quarantine)
 
 
