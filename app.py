@@ -77,9 +77,11 @@ def handle_file(msgs):
 
         if result is 'success':
             storage.transfer(hash_, quarantine, perm)
-        if result is 'failure':
+        elif result is 'failure':
             logger.info(hash_ + ' rejected')
             storage.delete_object(hash_, quarantine)
+        else:
+            logger.info('something done broke')
 
 
 @tornado.gen.coroutine
