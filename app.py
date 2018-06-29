@@ -52,7 +52,7 @@ def consume():
     yield mqc.connect()
 
     while True:
-        msgs = yield c.consume('uploadvalidation')
+        msgs = yield mqc.consume('uploadvalidation')
         for msg in msgs:
             print(msg)
 
