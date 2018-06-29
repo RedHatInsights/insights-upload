@@ -72,10 +72,6 @@ def handle_file(msgs):
         hash_ = msg['hash']
         result = msg['validation']
 
-        logger.info('handling file: ' + hash_)
-        logger.info('validated: ' + result)
-        logger.info(type(result))
-
         if result == 'success':
             storage.transfer(hash_, quarantine, perm)
         if result == 'failure':
