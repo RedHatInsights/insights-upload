@@ -68,11 +68,12 @@ def consume():
 @tornado.gen.coroutine
 def handle_file(msgs):
 
-    logger.info('handling file: ' + msgs[0]['hash'])
-
     for msg in msgs:
         hash_ = msg['hash']
         result = msg['validation']
+
+        logger.info('handling file: ' + hash_)
+        logger.info('validated: ' + result)
 
         if result is 'success':
             storage.transfer(hash_, quarantine, perm)
