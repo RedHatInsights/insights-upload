@@ -48,7 +48,7 @@ def delivery_report(err, msg):
 @tornado.gen.coroutine
 def consume():
 
-    mqc = clients.Consumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
+    mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
     yield mqc.connect()
 
     while True:
