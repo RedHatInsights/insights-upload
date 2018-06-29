@@ -39,6 +39,7 @@ perm = 'insights-upload-perm-test'
 
 # message queues
 mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
+mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
 
 def split_content(content):
     service = content.split('.')[2]
@@ -55,13 +56,11 @@ def delivery_report(err, msg):
 
 @tornado.gen.coroutine
 def consume():
-    mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
-    mqc.connect()
+    yield mqc.connect()
 
-    while True:
-        msgs = yield mqc.consume('uploadvalidation')
-        for msg in msgs:
-            logger.info(msg)
+    msgs = yield mqc.consume('uploadvalidation')
+    for msg in msgs:
+        logger.info(msg)
 
 
 @tornado.gen.coroutine
