@@ -35,6 +35,7 @@ values = {'principle': 'dumdum',
 # S3 buckets
 quarantine = 'insights-upload-quarantine'
 perm = 'insights-upload-perm-test'
+reject = 'insights-upload-rejected'
 
 
 # message queues
@@ -76,7 +77,7 @@ def handle_file(msgs):
             storage.transfer(hash_, quarantine, perm)
         if result == 'failure':
             logger.info(hash_ + ' rejected')
-            storage.delete_object(hash_, quarantine)
+            storage.transfer(hash_, quarantine, reject)
 
 
 @tornado.gen.coroutine
