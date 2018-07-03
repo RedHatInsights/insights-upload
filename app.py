@@ -164,8 +164,8 @@ class TmpFileHandler(tornado.web.RequestHandler):
             filename = tmp.name
             try:
                 storage.read_from_s3(quarantine, hash_value, filename)
-            except ClientError as e:
-                logger.error('unable to fetch file: ' + e)
+            except ClientError:
+                logger.error('unable to fetch file: %s' % hash_value)
             tmp.flush()
         return filename
 
