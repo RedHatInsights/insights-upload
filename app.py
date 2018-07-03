@@ -82,6 +82,7 @@ def handle_file(msgs):
 
 @tornado.gen.coroutine
 def produce(topic, msg):
+    mqp.connect()
     yield mqp.produce(topic, json.dumps(msg))
 
 
@@ -232,7 +233,6 @@ app = tornado.web.Application(endpoints)
 
 if __name__ == "__main__":
     app.listen(listen_port)
-    mqp.connect()
     loop = tornado.ioloop.IOLoop.current()
     loop.add_callback(consume)
     try:
