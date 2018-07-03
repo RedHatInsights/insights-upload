@@ -10,6 +10,7 @@ from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
 from time import gmtime, strftime
+from botocore.exceptions import ClientError
 from kiel import clients
 
 from utils import storage
@@ -161,7 +162,10 @@ class TmpFileHandler(tornado.web.RequestHandler):
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
             filename = tmp.name
-            storage.read_from_s3(quarantine, hash_value, filename)
+            try:
+                storage.read_from_s3(quarantine, hash_value, filename)
+            except ClientError as e:
+                logger.error('unable to fetch file: ' + e)
             tmp.flush()
         return filename
 
