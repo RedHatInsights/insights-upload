@@ -128,7 +128,10 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @tornado.gen.coroutine
     def post(self):
-        logger.info('post')
+        if not self.requst.files.get('upload'):
+            logger.info('Upload field not found')
+            self.set_status(415, "Upload field not found")
+            self.finish()
         invalid = self.upload_validation()
         if invalid:
             self.set_status(invalid[0], invalid[1])
