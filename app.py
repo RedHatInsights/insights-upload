@@ -82,7 +82,7 @@ def handle_file(msgs):
 
 @tornado.gen.coroutine
 def produce(topic, msg):
-    mqp.connect()
+    yield mqp.connect()
     yield mqp.produce(topic, json.dumps(msg))
 
 
