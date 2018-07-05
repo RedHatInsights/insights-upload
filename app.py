@@ -143,7 +143,7 @@ class UploadHandler(tornado.web.RequestHandler):
             result = yield self.write_data()
             values['hash'] = self.hash_value
             values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
-            self.set_status(result['status'][0], result['status'][1])
+            self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.finish()
             self.upload(result[1])
             while not storage.object_info(self.hash_value, quarantine):
