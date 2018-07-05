@@ -1,6 +1,8 @@
 import boto3
 import os
 
+from botocore.exceptions import ClientError
+
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', None)
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', None)
 
@@ -26,6 +28,14 @@ def transfer(key, source_bucket, dest_bucket):
 
 def delete_object(key, bucket_name):
     s3.delete_object(Bucket=bucket_name, Key=key)
+
+
+def object_info(key, bucket_name):
+    try:
+        s3.head_object(Bucket=bucket_name, Key=key)
+        return True
+    except ClientError:
+        return False
 
 
 # placeholder since we might need this and i don't want to forget

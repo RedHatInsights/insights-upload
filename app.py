@@ -119,14 +119,14 @@ class UploadHandler(tornado.web.RequestHandler):
             tmp.write(self.request.files['upload'][0]['body'])
             tmp.flush()
             filename = tmp.name
-        response = {'header': ('Status-Enpoint', '/api/v1/upload/status?id=' + self.hash_value),
-                    'status': (202, 'Accepted')}
+        response = {'status': (202, 'Accepted')}
         return response, filename
 
     @run_on_executor
     def upload(self, filename):
         storage.upload_to_s3(filename, quarantine, self.hash_value)
         os.remove(filename)
+        return 'done'
 
     @tornado.gen.coroutine
     def post(self):
@@ -143,11 +143,13 @@ class UploadHandler(tornado.web.RequestHandler):
             result = yield self.write_data()
             values['hash'] = self.hash_value
             values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
-            self.set_status(result[0]['status'][0], result[0]['status'][1])
-            self.set_header(result[0]['header'][0], result[0]['header'][1])
+            self.set_status(result['status'][0], result['status'][1])
             self.finish()
             self.upload(result[1])
-            produce(service, values)
+            while not storage.object_info(self.hash_value, quarantine):
+                pass
+            else:
+                produce(service, values)
 
     def options(self):
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
