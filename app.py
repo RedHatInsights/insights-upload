@@ -149,6 +149,7 @@ class UploadHandler(tornado.web.RequestHandler):
             while not storage.object_info(self.hash_value, quarantine):
                 pass
             else:
+                logger.info('upload id: ' + self.hash_value)
                 produce(service, values)
 
     def options(self):
