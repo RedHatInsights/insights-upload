@@ -76,6 +76,7 @@ def handle_file(msgs):
 
         if result == 'success':
             storage.transfer(hash_, quarantine, perm)
+            produce('available', {'url': 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/ ' + hash_})
         if result == 'failure':
             logger.info(hash_ + ' rejected')
             storage.transfer(hash_, quarantine, reject)
