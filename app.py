@@ -18,8 +18,7 @@ from utils import storage
 
 # Read config
 config = configparser.ConfigParser(os.environ)
-config.read('config.ini')
-config = config['default']
+config = config['DEFAULT']
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('upload-service')
