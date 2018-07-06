@@ -44,6 +44,8 @@ REJECT = config.get('s3_reject')
 
 MQ = config.get('kafkamq')
 
+ROUTE = config.get('route')
+
 # message queues
 mqp = clients.Producer([MQ])
 mqc = clients.SingleConsumer(brokers=[MQ])
