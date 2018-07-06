@@ -5,6 +5,7 @@ import re
 import uuid
 import json
 import logging
+import configparser
 
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
@@ -15,33 +16,38 @@ from kiel import clients
 
 from utils import storage
 
+# Read config
+config = configparser.ConfigParser(os.environ)
+config.read('config.ini')
+config = config['default']
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('upload-service')
 
 content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
+
 # set max length to 10.5 MB (one MB larger than peak)
-max_length = os.getenv('MAX_LENGTH', 11010048)
-listen_port = os.getenv('LISTEN_PORT', 8888)
+MAX_LENGTH = int(config.get('max_length', 11010048))
+LISTEN_PORT = int(config.get('listen_port', 8888))
 
 # Maximum workers for threaded execution
-MAX_WORKERS = 10
+MAX_WORKERS = int(config.get('max_workers', 10))
 
 # writing these values to sqlite for now
 # these are dummy values since we can't yet get a principle or rh_account
 values = {'principle': 'dumdum',
           'rh_account': '123456'}
 
-
 # S3 buckets
-quarantine = 'insights-upload-quarantine'
-perm = 'insights-upload-perm-test'
-reject = 'insights-upload-rejected'
+QUARANTINE = config.get('s3_quarantine')
+PERM = config.get('s3_perm')
+REJECT = config.get('s3_reject')
 
+MQ = config.get('kafkamq')
 
 # message queues
-mqp = clients.Producer(['kafka.cmitchel-msgq-test.svc:29092'])
-mqc = clients.SingleConsumer(brokers=['kafka.cmitchel-msgq-test.svc:29092'])
+mqp = clients.Producer([MQ])
+mqc = clients.SingleConsumer(brokers=[MQ])
 
 
 def split_content(content):
@@ -75,11 +81,11 @@ def handle_file(msgs):
         result = msg['validation']
 
         if result == 'success':
-            storage.transfer(hash_, quarantine, perm)
-            produce('available', {'url': 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/store/ ' + hash_})
+            storage.transfer(hash_, QUARANTINE, PERM)
+            produce('available', {'url': ROUTE + '/api/v1/store/' + hash_})
         if result == 'failure':
             logger.info(hash_ + ' rejected')
-            storage.transfer(hash_, quarantine, reject)
+            storage.transfer(hash_, QUARANTINE, REJECT)
 
 
 @tornado.gen.coroutine
@@ -104,8 +110,8 @@ class UploadHandler(tornado.web.RequestHandler):
     executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
     def upload_validation(self):
-        if int(self.request.headers['Content-Length']) >= max_length:
-            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + max_length + ' bytes')
+        if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
+            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + MAX_LENGTH + ' bytes')
             return error
         if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
             error = (415, 'Unsupported Media Type')
@@ -125,7 +131,7 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @run_on_executor
     def upload(self, filename):
-        storage.upload_to_s3(filename, quarantine, self.hash_value)
+        storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
         os.remove(filename)
         return 'done'
 
@@ -143,11 +149,11 @@ class UploadHandler(tornado.web.RequestHandler):
             self.hash_value = uuid.uuid4().hex
             result = yield self.write_data()
             values['hash'] = self.hash_value
-            values['url'] = 'http://upload-service-platform-ci.1b13.insights.openshiftapps.com/api/v1/tmpstore/' + self.hash_value
+            values['url'] = ROUTE + '/api/v1/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.finish()
             self.upload(result[1])
-            while not storage.object_info(self.hash_value, quarantine):
+            while not storage.object_info(self.hash_value, QUARANTINE):
                 pass
             else:
                 logger.info('upload id: ' + self.hash_value)
@@ -167,7 +173,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
         with NamedTemporaryFile(delete=False) as tmp:
             filename = tmp.name
             try:
-                storage.read_from_s3(quarantine, hash_value, filename)
+                storage.read_from_s3(QUARANTINE, hash_value, filename)
             except ClientError:
                 logger.error('unable to fetch file: %s' % hash_value)
             tmp.flush()
@@ -195,7 +201,7 @@ class StaticFileHandler(tornado.web.RequestHandler):
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
             filename = tmp.name
-            storage.read_from_s3(perm, hash_value, filename)
+            storage.read_from_s3(PERM, hash_value, filename)
             tmp.flush()
         return filename
 
@@ -217,7 +223,7 @@ class StaticFileHandler(tornado.web.RequestHandler):
 
     def delete(self):
         hash_value = self.request.uri.split('/')[4]
-        storage.delete_object(hash_value, perm)
+        storage.delete_object(hash_value, PERM)
         self.set_status(202, 'Accepted')
 
 
@@ -240,7 +246,7 @@ app = tornado.web.Application(endpoints)
 
 
 if __name__ == "__main__":
-    app.listen(listen_port)
+    app.listen(LISTEN_PORT)
     loop = tornado.ioloop.IOLoop.current()
     loop.add_callback(consume)
     try:
