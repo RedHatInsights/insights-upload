@@ -19,7 +19,7 @@ from utils import storage
 logging.basicConfig(level=logging.ERROR)
 logger = logging.getLogger('upload-service')
 
-content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
+content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 
 # set max length to 10.5 MB (one MB larger than peak)
 MAX_LENGTH = int(os.getenv('MAX_LENGTH', 11010048))
@@ -49,13 +49,12 @@ mqc = clients.SingleConsumer(brokers=[MQ])
 
 def split_content(content):
     service = content.split('.')[2]
-    filename = content.split('.')[-1]
-    return service, filename
+    return service
 
 
 def delivery_report(err, msg):
     if err is not None:
-        logger.info('Message delivery failed: {}'.format(err))
+        logger.error('Message delivery failed: {}'.format(err))
     else:
         logger.info('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
 
@@ -142,7 +141,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if invalid:
             self.set_status(invalid[0], invalid[1])
         else:
-            service, filename = split_content(self.request.files['upload'][0]['content_type'])
+            service = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
             result = yield self.write_data()
             values['hash'] = self.hash_value
@@ -217,11 +216,6 @@ class StaticFileHandler(tornado.web.RequestHandler):
                     self.set_status(200)
                     self.write(data)
         self.finish()
-
-    def delete(self):
-        hash_value = self.request.uri.split('/')[4]
-        storage.delete_object(hash_value, PERM)
-        self.set_status(202, 'Accepted')
 
 
 class VersionHandler(tornado.web.RequestHandler):
