@@ -189,6 +189,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
                     self.set_status(200)
                     self.write(data)
         self.finish()
+        os.remove(filename)
 
 
 class StaticFileHandler(tornado.web.RequestHandler):
