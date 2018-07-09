@@ -5,7 +5,6 @@ import re
 import uuid
 import json
 import logging
-import configparser
 
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
@@ -16,9 +15,6 @@ from kiel import clients
 
 from utils import storage
 
-# Read config
-config = configparser.ConfigParser(os.environ)
-config = config['DEFAULT']
 # Logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('upload-service')
@@ -26,11 +22,11 @@ logger = logging.getLogger('upload-service')
 content_regex = '^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 
 # set max length to 10.5 MB (one MB larger than peak)
-MAX_LENGTH = int(config.get('max_length', 11010048))
-LISTEN_PORT = int(config.get('listen_port', 8888))
+MAX_LENGTH = int(os.getenv('MAX_LENGTH', 11010048))
+LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
 
 # Maximum workers for threaded execution
-MAX_WORKERS = int(config.get('max_workers', 10))
+MAX_WORKERS = int(os.getenv('MAX_WORKERS', 10))
 
 # writing these values to sqlite for now
 # these are dummy values since we can't yet get a principle or rh_account
@@ -38,13 +34,13 @@ values = {'principle': 'dumdum',
           'rh_account': '123456'}
 
 # S3 buckets
-QUARANTINE = config.get('s3_quarantine')
-PERM = config.get('s3_perm')
-REJECT = config.get('s3_reject')
+QUARANTINE = os.getenv('S3_QUARANTINE')
+PERM = os.getenv('S3_PERM')
+REJECT = os.getenv('S3_REJECT')
 
-MQ = config.get('kafkamq')
+MQ = os.getenv('KAFKAMQ')
 
-ROUTE = config.get('route')
+ROUTE = os.getenv('ROUTE')
 
 # message queues
 mqp = clients.Producer([MQ])
