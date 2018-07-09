@@ -28,7 +28,6 @@ LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
 # Maximum workers for threaded execution
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 10))
 
-# writing these values to sqlite for now
 # these are dummy values since we can't yet get a principle or rh_account
 values = {'principle': 'dumdum',
           'rh_account': '123456'}
@@ -44,7 +43,7 @@ ROUTE = os.getenv('ROUTE')
 
 # message queues
 mqp = clients.Producer([MQ])
-mqc = clients.SingleConsumer(brokers=[MQ])
+mqc = clients.SingleConsumer(brokers=[MQ]) 
 
 
 def split_content(content):
@@ -71,6 +70,8 @@ def consume():
 
 @tornado.gen.coroutine
 def handle_file(msgs):
+    # Based on validation message, the service will move the payload
+    # to either permanent storage, or rejected storage.
 
     for msg in msgs:
         hash_ = msg['hash']
@@ -160,10 +161,7 @@ class UploadHandler(tornado.web.RequestHandler):
 
 
 class TmpFileHandler(tornado.web.RequestHandler):
-    # temporary location for apps to grab the files from. once validated,
-    # they send an empty PUT request to approve it or a DELETE request to
-    # remove it. If approved, it moves to a more permanent location with a
-    # new URI
+    # temporary location for downloading the payload.
 
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
@@ -193,7 +191,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
 
 
 class StaticFileHandler(tornado.web.RequestHandler):
-    # Location for grabbing file from the long term storage
+    # Location for downloading file from the long term storage
 
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
@@ -203,7 +201,6 @@ class StaticFileHandler(tornado.web.RequestHandler):
         return filename
 
     def get(self):
-        # use the storage broker service to grab the file from S3
         hash_value = self.request.uri.split('/')[4]
         filename = self.read_data(hash_value)
         buf_size = 4096

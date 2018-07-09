@@ -5,11 +5,13 @@ name = "pypi"
 
 [dev-packages]
 pylint = "*"
+pytest = "*"
 
 [packages]
 tornado = "*"
 "boto3" = "*"
 kiel = "*"
+requests = "*"
 
 [requires]
 python_version = "3.6"
