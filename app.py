@@ -63,9 +63,12 @@ def consume():
     yield mqc.connect()
 
     while True:
-        msgs = yield mqc.consume('uploadvalidation')
-        if msgs:
-            handle_file(msgs)
+        try:
+            msgs = yield mqc.consume('uploadvalidation')
+            if msgs:
+                handle_file(msgs)
+        except NoBrokersError:
+            logger.error('Brokers down or Topic not available')
 
 
 @tornado.gen.coroutine
