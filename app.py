@@ -9,9 +9,8 @@ import logging
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
-from time import gmtime, strftime
 from botocore.exceptions import ClientError
-from kiel import clients
+from kiel import clients, exc
 
 from utils import storage
 
@@ -62,10 +61,13 @@ def delivery_report(err, msg):
 def consume():
     yield mqc.connect()
 
-    while True:
-        msgs = yield mqc.consume('uploadvalidation')
-        if msgs:
-            handle_file(msgs)
+    try:
+        while True:
+            msgs = yield mqc.consume('uploadvalidation')
+            if msgs:
+                handle_file(msgs)
+    except exc.NoBrokersError:
+        logger.error('Consume Failure: No Brokers Available')
 
 
 @tornado.gen.coroutine
@@ -88,7 +90,10 @@ def handle_file(msgs):
 @tornado.gen.coroutine
 def produce(topic, msg):
     yield mqp.connect()
-    yield mqp.produce(topic, json.dumps(msg))
+    try:
+        yield mqp.produce(topic, json.dumps(msg))
+    except exc.NoBrokersError:
+        logger.error('Produce Failed: No Brokers Available')
 
 
 class RootHandler(tornado.web.RequestHandler):
