@@ -214,6 +214,7 @@ class StaticFileHandler(tornado.web.RequestHandler):
                     self.set_status(200)
                     self.write(data)
         self.finish()
+        os.remove(filename)
 
 
 class VersionHandler(tornado.web.RequestHandler):
