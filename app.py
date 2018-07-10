@@ -42,8 +42,8 @@ MQ = os.getenv('KAFKAMQ').split(',')
 ROUTE = os.getenv('ROUTE')
 
 # message queues
-mqp = clients.Producer([MQ])
-mqc = clients.SingleConsumer(brokers=[MQ]) 
+mqp = clients.Producer(MQ)
+mqc = clients.SingleConsumer(brokers=MQ) 
 
 
 def split_content(content):
