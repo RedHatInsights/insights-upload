@@ -67,7 +67,7 @@ def consume():
             msgs = yield mqc.consume('uploadvalidation')
             if msgs:
                 handle_file(msgs)
-        except NoBrokersError:
+        except kiel.exc.NoBrokersError:
             logger.error('Brokers down or Topic not available')
 
 
