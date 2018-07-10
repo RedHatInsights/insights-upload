@@ -42,7 +42,7 @@ ROUTE = os.getenv('ROUTE')
 
 # message queues
 mqp = clients.Producer(MQ)
-mqc = clients.SingleConsumer(brokers=MQ) 
+mqc = clients.SingleConsumer(MQ) 
 
 
 def split_content(content):
