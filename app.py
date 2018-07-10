@@ -37,7 +37,7 @@ QUARANTINE = os.getenv('S3_QUARANTINE')
 PERM = os.getenv('S3_PERM')
 REJECT = os.getenv('S3_REJECT')
 
-MQ = os.getenv('KAFKAMQ')
+MQ = os.getenv('KAFKAMQ').split(',')
 
 ROUTE = os.getenv('ROUTE')
 
