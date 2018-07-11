@@ -1,4 +1,3 @@
-import unittest
 import requests
 
 from tornado.httpclient import AsyncHTTPClient
@@ -18,6 +17,8 @@ prepare = a.prepare()
 content_type = prepare.headers.get('Content-Type')
 body = prepare.body
 headers = {"Content-Type": content_type}
+
+
 class TestEndpoints(AsyncHTTPTestCase):
 
     def get_app(self):
