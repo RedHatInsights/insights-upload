@@ -8,6 +8,16 @@ import app
 
 client = AsyncHTTPClient()
 
+# Build HTTP Request so that Tornado can recognize and use the payload test
+files = {"upload": ('payload.tar.gz', open('./tests/payload.tar.gz'),
+         'application/vnd.redhat.advisor.payload+tgz')}
+data = {}
+a = requests.Request(url="http://localhost:8888/api/v1/upload",
+                     files=files, data=data)
+prepare = a.prepare()
+content_type = prepare.headers.get('Content-Type')
+body = prepare.body
+headers = {"Content-Type": content_type}
 class TestEndpoints(AsyncHTTPTestCase):
 
     def get_app(self):
@@ -27,6 +37,8 @@ class TestEndpoints(AsyncHTTPTestCase):
         self.assertEqual(response.body, b"Accepted Content-Types: gzipped tarfile, zip file")
         response = yield self.http_client.fetch(self.get_url('/api/v1/upload'), method='OPTIONS')
         self.assertEqual(response.headers['Allow'], 'GET, POST, HEAD, OPTIONS')
+        response = yield self.http_client.fetch(self.get_url('/api/v1/upload'), method='POST', body=body, headers=headers)
+        self.assertEqual(response.code, 202)
 
     @gen_test
     def test_version(self):

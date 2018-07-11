@@ -36,13 +36,13 @@ QUARANTINE = os.getenv('S3_QUARANTINE')
 PERM = os.getenv('S3_PERM')
 REJECT = os.getenv('S3_REJECT')
 
-MQ = os.getenv('KAFKAMQ').split(',')
+MQ = os.getenv('KAFKAMQ', 'kafka.cmitchel-msgq-test.svc').split(',')
 
-ROUTE = os.getenv('ROUTE')
+ROUTE = os.getenv('ROUTE', 'http://localhost:8888')
 
 # message queues
 mqp = clients.Producer(MQ)
-mqc = clients.SingleConsumer(MQ) 
+mqc = clients.SingleConsumer(MQ)
 
 
 def split_content(content):
