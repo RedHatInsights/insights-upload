@@ -8,9 +8,7 @@ import logging
 
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
-from concurrent.futures.process import BrokenProcessPool
 from tornado.concurrent import run_on_executor
-from botocore.exceptions import ClientError
 from kiel import clients, exc
 
 from utils import storage
@@ -173,11 +171,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
             filename = tmp.name
-            try:
-                storage.read_from_s3(QUARANTINE, hash_value, filename)
-            except BrokenProcessPool as ex:
-                logger.error('unable to fetch file: %s' % hash_value)
-                logger.error(f"{ex}")
+            storage.read_from_s3(QUARANTINE, hash_value, filename)
             tmp.flush()
         return filename
 
