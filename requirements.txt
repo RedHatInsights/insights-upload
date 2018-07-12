@@ -3,5 +3,4 @@ boto3
 kiel
 requests
 pytest
-nose
-mock
+flake8

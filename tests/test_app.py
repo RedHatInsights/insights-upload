@@ -8,7 +8,7 @@ import app
 client = AsyncHTTPClient()
 
 # Build HTTP Request so that Tornado can recognize and use the payload test
-files = {"upload": ('payload.tar.gz', open('./tests/payload.tar.gz'),
+files = {"upload": ('payload.tar.gz', open('./tests/payload.tar.gz', 'rb'),
          'application/vnd.redhat.advisor.payload+tgz')}
 data = {}
 a = requests.Request(url="http://localhost:8888/api/v1/upload",
