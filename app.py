@@ -8,6 +8,7 @@ import logging
 
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures.process import BrokenProcessPool
 from tornado.concurrent import run_on_executor
 from botocore.exceptions import ClientError
 from kiel import clients, exc
@@ -46,15 +47,16 @@ mqc = clients.SingleConsumer(MQ)
 
 
 def split_content(content):
+    """Split the content-type to find the service name
+
+    Arguments:
+        content {str} -- content-type of the payload
+
+    Returns:
+        str -- Service name to be notified of upload
+    """
     service = content.split('.')[2]
     return service
-
-
-def delivery_report(err, msg):
-    if err is not None:
-        logger.error('Message delivery failed: {}'.format(err))
-    else:
-        logger.info('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
 
 
 @tornado.gen.coroutine
@@ -173,8 +175,9 @@ class TmpFileHandler(tornado.web.RequestHandler):
             filename = tmp.name
             try:
                 storage.read_from_s3(QUARANTINE, hash_value, filename)
-            except ClientError:
+            except BrokenProcessPool as ex:
                 logger.error('unable to fetch file: %s' % hash_value)
+                logger.error(f"{ex}")
             tmp.flush()
         return filename
 
@@ -182,6 +185,7 @@ class TmpFileHandler(tornado.web.RequestHandler):
         hash_value = self.request.uri.split('/')[4]
         filename = self.read_data(hash_value)
         buf_size = 4096
+        logger.info('Tmpfile downloaded: ' + hash_value)
         with open(filename, 'rb') as f:
             while True:
                 data = f.read(buf_size)
@@ -201,6 +205,7 @@ class StaticFileHandler(tornado.web.RequestHandler):
     def read_data(self, hash_value):
         with NamedTemporaryFile(delete=False) as tmp:
             filename = tmp.name
+            logger.info('Read from S3: ' + hash_value)
             storage.read_from_s3(PERM, hash_value, filename)
             tmp.flush()
         return filename
