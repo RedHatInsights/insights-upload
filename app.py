@@ -176,7 +176,7 @@ class UploadHandler(tornado.web.RequestHandler):
         Returns:
             str -- done. used to notify upload service to send to MQ
         """
-        url = yield storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
+        url = storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
         os.remove(filename)
         return url
 
