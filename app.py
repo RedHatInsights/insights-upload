@@ -86,11 +86,11 @@ def handle_file(msgs):
         result = msg['validation']
 
         if result == 'success':
-            storage.transfer(hash_, QUARANTINE, PERM)
-            produce('available', {'url': ROUTE + '/api/v1/store/' + hash_})
+            url = storage.transfer(hash_, QUARANTINE, PERM)
+            produce('available', {'url': url})
         if result == 'failure':
             logger.info(hash_ + ' rejected')
-            storage.transfer(hash_, QUARANTINE, REJECT)
+            url = storage.transfer(hash_, QUARANTINE, REJECT)
 
 
 @tornado.gen.coroutine
@@ -176,9 +176,9 @@ class UploadHandler(tornado.web.RequestHandler):
         Returns:
             str -- done. used to notify upload service to send to MQ
         """
-        storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
+        url = storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
         os.remove(filename)
-        return 'done'
+        return url
 
     @tornado.gen.coroutine
     def post(self):
@@ -199,10 +199,10 @@ class UploadHandler(tornado.web.RequestHandler):
             self.hash_value = uuid.uuid4().hex
             result = yield self.write_data()
             values['hash'] = self.hash_value
-            values['url'] = ROUTE + '/api/v1/tmpstore/' + self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.finish()
-            self.upload(result[1])
+            url = self.upload(result[1])
+            values['url'] = url
             while not storage.object_info(self.hash_value, QUARANTINE):
                 pass
             else:
@@ -213,81 +213,6 @@ class UploadHandler(tornado.web.RequestHandler):
         """Handle OPTIONS request to upload endpoint
         """
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
-
-
-class TmpFileHandler(tornado.web.RequestHandler):
-    """Class for handling the `tmpstore` endpoint
-    """
-    def read_data(self, hash_value):
-        """Download the file from S3
-
-        Arguments:cription]
-            hash_value {str} -- UUID of requested payload
-        """
-        with NamedTemporaryFile(delete=False) as tmp:
-            filename = tmp.name
-            storage.read_from_s3(QUARANTINE, hash_value, filename)
-            tmp.flush()
-        return filename
-
-    def get(self):
-        """Handle GET requests to tmpstore endpoint
-
-        Download payload from S3 and deliver to requesting client
-        """
-        hash_value = self.request.uri.split('/')[4]
-        filename = self.read_data(hash_value)
-        buf_size = 4096
-        logger.info('Tmpfile downloaded: ' + hash_value)
-        with open(filename, 'rb') as f:
-            while True:
-                data = f.read(buf_size)
-                if not data:
-                    self.set_status(404)
-                    break
-                else:
-                    self.set_status(200)
-                    self.write(data)
-        self.finish()
-        os.remove(filename)
-
-
-class StaticFileHandler(tornado.web.RequestHandler):
-    """Handle requests to the `store` endpoint.
-    """
-
-    def read_data(self, hash_value):
-        """Read data from the permanent S3 bucket
-
-        Arguments:
-            hash_value {str} -- UUID of requested payload
-        """
-        with NamedTemporaryFile(delete=False) as tmp:
-            filename = tmp.name
-            logger.info('Read from S3: ' + hash_value)
-            storage.read_from_s3(PERM, hash_value, filename)
-            tmp.flush()
-        return filename
-
-    def get(self):
-        """handle GET requests to `store` endpoint
-
-        Deliver payload to requesting client
-        """
-        hash_value = self.request.uri.split('/')[4]
-        filename = self.read_data(hash_value)
-        buf_size = 4096
-        with open(filename, 'rb') as f:
-            while True:
-                data = f.read(buf_size)
-                if not data:
-                    self.set_status(404)
-                    break
-                else:
-                    self.set_status(200)
-                    self.write(data)
-        self.finish()
-        os.remove(filename)
 
 
 class VersionHandler(tornado.web.RequestHandler):
@@ -305,8 +230,6 @@ endpoints = [
     (r"/", RootHandler),
     (r"/api/v1/version", VersionHandler),
     (r"/api/v1/upload", UploadHandler),
-    (r"/api/v1/tmpstore/\w{32}", TmpFileHandler),
-    (r"/api/v1/store/\w{32}", StaticFileHandler)
 ]
 
 app = tornado.web.Application(endpoints)

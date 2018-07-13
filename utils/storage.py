@@ -13,6 +13,10 @@ s3 = boto3.client('s3',
 
 def upload_to_s3(data, bucket_name, key):
     s3.upload_file(data, bucket_name, key)
+    url = s3.generate_presigned_url('get_object',
+                                    Params={'Bucket': bucket_name,
+                                            'Key': key}, ExpiresIn=100)
+    return url
 
 
 def read_from_s3(bucket_name, key, filename):
@@ -24,6 +28,10 @@ def transfer(key, source_bucket, dest_bucket):
                 'Key': key}
     s3.copy(copy_src, dest_bucket, copy_src['Key'])
     s3.delete_object(Bucket=source_bucket, Key=key)
+    url = s3.generate_presigned_url('get_object',
+                                    Params={'Bucket': dest_bucket,
+                                            'Key': key})
+    return url
 
 
 def delete_object(key, bucket_name):
