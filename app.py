@@ -14,7 +14,7 @@ from kiel import clients, exc
 from utils import storage
 
 # Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('upload-service')
 
 content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
