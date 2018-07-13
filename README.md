@@ -11,28 +11,37 @@ services of new and available payloads for processing.
 The service runs in Openshift Dedicated.
 
 ## Running Locally
-WIP: Currently the server will fall over locally because it does not have access
+**WIP**: Currently the server will fall over locally because it does not have access
 to the message queue when it attempts to connect start. Working on a way around
 this particular problem
 
 Clone this repository
+
     git clone git@github.com:RedHatInsights/insights-upload
 
 Setup a virtual environmnet and install dependencies
+
     pipenv install
     pipenv shell
 
 OR
+
     virtualenv .
     source bin/activate
     pip install -r requirements
 
 Run `app.py` to launch a local version of the upload service.
+
     python app.py
 
 ## Development
 Follow the above steps to get an environment setup for development. Any new
 features added to the application should be accompanied by a Unittest in `./tests`
 
-For information on testing using Tornado, see [the documentation](http://www.tornadoweb.org/en/stable/_modules/tornado/testing.html)
+To test the app, activate the virtualenv and then run pytest.
+
+    source bin/activate
+    pytest
+
+For information on Tornado testing, see [the documentation](http://www.tornadoweb.org/en/stable/_modules/tornado/testing.html)
 

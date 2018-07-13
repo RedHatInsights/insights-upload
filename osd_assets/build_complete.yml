@@ -1,0 +1,195 @@
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftWebConsole
+  labels:
+    app: upload-service
+  name: upload-service
+  namespace: platform-ci
+spec:
+  replicas: 1
+  selector:
+    deploymentconfig: upload-service
+  strategy:
+    activeDeadlineSeconds: 21600
+    recreateParams:
+      timeoutSeconds: 600
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      creationTimestamp: null
+      labels:
+        app: upload-service
+        deploymentconfig: upload-service
+    spec:
+      containers:
+      - env:
+        - name: LISTEN_PORT
+          value: "8080"
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom:
+            secretKeyRef:
+              key: aws_access_key_id
+              name: insights-upload-quarantine-storage
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom:
+            secretKeyRef:
+              key: aws_secret_access_key
+              name: insights-upload-quarantine-storage
+        - name: MAX_LENGTH
+          value: "11010048"
+        - name: MAX_WORKERS
+          value: "10"
+        - name: S3_QUARANTINE
+          value: insights-upload-quarantine
+        - name: S3_PERM
+          value: insights-upload-perm-test
+        - name: S3_REJECT
+          value: insights-upload-rejected
+        - name: KAFKAMQ
+          value: kafka.cmitchel-msgq-test.svc:29092
+        - name: ROUTE
+          value: http://upload-service.platform-ci.svc:8080
+        image: 172.30.217.42:5000/platform-ci/upload-service@sha256:036ac419d918df82da9b8202d66ca84b3bbe082dcabafe7da1d975063f21a09b
+        imagePullPolicy: Always
+        name: upload-service
+        ports:
+        - containerPort: 8080
+          protocol: TCP
+        resources: {}
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+  test: false
+  triggers:
+  - imageChangeParams:
+      automatic: true
+      containerNames:
+      - upload-service
+      from:
+        kind: ImageStreamTag
+        name: upload-service:latest
+        namespace: platform-ci
+    type: ImageChange
+  - type: ConfigChange
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftWebConsole
+  labels:
+    app: upload-service
+  name: upload-service
+  namespace: platform-ci
+spec:
+  ports:
+  - name: 8080-tcp
+    port: 8080
+    protocol: TCP
+    targetPort: 8080
+  selector:
+    deploymentconfig: upload-service
+  sessionAffinity: None
+  type: ClusterIP
+
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftWebConsole
+    openshift.io/host.generated: "true"
+  labels:
+    app: upload-service
+  name: upload-service
+  namespace: platform-ci
+spec:
+  host: upload-service-platform-ci.1b13.insights.openshiftapps.com
+  port:
+    targetPort: 8080-tcp
+  to:
+    kind: Service
+    name: upload-service
+    weight: 100
+  wildcardPolicy: None
+
+---
+apiVersion: build.openshift.io/v1
+kind: BuildConfig
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftWebConsole
+  labels:
+    app: upload-service
+  name: upload-service
+  namespace: platform-ci
+spec:
+  nodeSelector: null
+  output:
+    to:
+      kind: ImageStreamTag
+      name: upload-service:latest
+  postCommit: {}
+  resources: {}
+  runPolicy: Serial
+  source:
+    git:
+      ref: master
+      uri: git@github.com:RedHatInsights/insights-upload.git
+    sourceSecret:
+      name: nachobot
+    type: Git
+  strategy:
+    sourceStrategy:
+      from:
+        kind: ImageStreamTag
+        name: python:3.6
+    type: Source
+  triggers:
+  - github:
+      secret: 946709cf8549a8be
+    type: GitHub
+  - generic:
+      secret: e139e03916c8170d
+    type: Generic
+  - type: ConfigChange
+
+---
+apiVersion: v1
+data:
+  aws_access_key_id: QUtJQUpLTFA2SUVIQzJSSjVTTVE=
+  aws_secret_access_key: RUVDVHAvVktpMEIrNDZYUmxxVEV2UE1TRHNySk0zUm5sT2dxRHpRQQ==
+  s3_bucket: aW5zaWdodHMtdXBsb2FkLXF1YXJhbnRpbmU=
+kind: Secret
+metadata:
+  name: insights-upload-quarantine-storage
+  namespace: platform-ci
+type: Opaque
+
+---
+apiVersion: image.openshift.io/v1
+kind: ImageStream
+metadata:
+  annotations:
+    openshift.io/generated-by: OpenShiftWebConsole
+  labels:
+    app: upload-service
+  name: upload-service
+  namespace: platform-ci
+spec:
+  lookupPolicy:
+    local: false
