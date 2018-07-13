@@ -14,7 +14,7 @@ from kiel import clients, exc
 from utils import storage
 
 # Logging
-logging.basicConfig(level=logging.WARNING)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('upload-service')
 
 content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
@@ -176,7 +176,7 @@ class UploadHandler(tornado.web.RequestHandler):
         Returns:
             str -- done. used to notify upload service to send to MQ
         """
-        url = storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
+        url = yield storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
         os.remove(filename)
         return url
 
@@ -202,6 +202,7 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.finish()
             url = self.upload(result[1])
+            logger.info(url)
             values['url'] = url
             while not storage.object_info(self.hash_value, QUARANTINE):
                 pass
