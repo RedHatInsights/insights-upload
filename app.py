@@ -201,14 +201,14 @@ class UploadHandler(tornado.web.RequestHandler):
             values['hash'] = self.hash_value
             self.set_status(result[0]['status'][0], result[0]['status'][1])
             self.finish()
-            url = self.upload(result[1])
+            url = yield self.upload(result[1])
             logger.info(url)
             values['url'] = url
             while not storage.object_info(self.hash_value, QUARANTINE):
                 pass
             else:
                 logger.info('upload id: ' + self.hash_value)
-                produce(service, values)
+                yield produce(service, values)
 
     def options(self):
         """Handle OPTIONS request to upload endpoint
