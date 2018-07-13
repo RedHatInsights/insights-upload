@@ -59,6 +59,9 @@ def split_content(content):
 
 @tornado.gen.coroutine
 def consume():
+    """Connect to the message queue and consume messages from
+       the 'uploadvalidation' queue
+    """
     yield mqc.connect()
 
     try:
@@ -72,9 +75,12 @@ def consume():
 
 @tornado.gen.coroutine
 def handle_file(msgs):
-    # Based on validation message, the service will move the payload
-    # to either permanent storage, or rejected storage.
+    """Determine which bucket to put a payload in based on the message
+       returned from the validating service.
 
+    Arguments:
+        msgs {dict} -- The message returned by the validating service
+    """
     for msg in msgs:
         hash_ = msg['hash']
         result = msg['validation']
@@ -89,6 +95,13 @@ def handle_file(msgs):
 
 @tornado.gen.coroutine
 def produce(topic, msg):
+    """Proce a message to a given topic on the MQ
+
+    Arguments:
+        topic {str} -- The service name to notify
+        msg {dict} -- JSON containing a rh_account, principal, payload hash,
+                        and url for download
+    """
     yield mqp.connect()
     try:
         yield mqp.produce(topic, json.dumps(msg))
@@ -97,21 +110,33 @@ def produce(topic, msg):
 
 
 class RootHandler(tornado.web.RequestHandler):
+    """Handles requests to root
+    """
 
     def get(self):
+        """Handle GET requests to the root url
+        """
         self.write("boop")
 
     def options(self):
+        """Return a header containing the available methods
+        """
         self.add_header('Allow', 'GET, HEAD, OPTIONS')
 
 
 class UploadHandler(tornado.web.RequestHandler):
-    # accepts uploads. No auth implemented yet, likely to be handled by 3scale
-    # anyway.
+    """Handles requests to the upload endpoint
+    """
 
+    # * Setup the thread pool for backgrounding the upload process
     executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
     def upload_validation(self):
+        """Validate the upload using general criteria
+
+        Returns:
+            tuple -- status code and a user friendly message
+        """
         if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
             error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + MAX_LENGTH + ' bytes')
             return error
@@ -120,10 +145,19 @@ class UploadHandler(tornado.web.RequestHandler):
             return error
 
     def get(self):
+        """Handles GET requests to the upload endpoint
+        """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
     @run_on_executor
     def write_data(self):
+        """Writes the uploaded date to a tmp file in prepartion for upload to
+           S3
+
+           Returns:
+                dict -- status tuple containing error code and message
+                str -- tmp filename so it can be uploaded
+        """
         with NamedTemporaryFile(delete=False) as tmp:
             tmp.write(self.request.files['upload'][0]['body'])
             tmp.flush()
@@ -133,12 +167,26 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @run_on_executor
     def upload(self, filename):
+        """Upload the payload to S3 Quarantine Bucket
+
+        Arguments:
+            filename {str} -- The filename to upload. Should be the tmpfile
+                              created by `write_data`
+
+        Returns:
+            str -- done. used to notify upload service to send to MQ
+        """
         storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
         os.remove(filename)
         return 'done'
 
     @tornado.gen.coroutine
     def post(self):
+        """Handle POST requests to the upload endpoint
+
+        Validate upload, get service name, create UUID, upload to S3, and send
+        message to MQ
+        """
         if not self.request.files.get('upload'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
@@ -162,13 +210,20 @@ class UploadHandler(tornado.web.RequestHandler):
                 produce(service, values)
 
     def options(self):
+        """Handle OPTIONS request to upload endpoint
+        """
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
 
 
 class TmpFileHandler(tornado.web.RequestHandler):
-    # temporary location for downloading the payload.
-
+    """Class for handling the `tmpstore` endpoint
+    """
     def read_data(self, hash_value):
+        """Download the file from S3
+
+        Arguments:cription]
+            hash_value {str} -- UUID of requested payload
+        """
         with NamedTemporaryFile(delete=False) as tmp:
             filename = tmp.name
             storage.read_from_s3(QUARANTINE, hash_value, filename)
@@ -176,6 +231,10 @@ class TmpFileHandler(tornado.web.RequestHandler):
         return filename
 
     def get(self):
+        """Handle GET requests to tmpstore endpoint
+
+        Download payload from S3 and deliver to requesting client
+        """
         hash_value = self.request.uri.split('/')[4]
         filename = self.read_data(hash_value)
         buf_size = 4096
@@ -194,9 +253,15 @@ class TmpFileHandler(tornado.web.RequestHandler):
 
 
 class StaticFileHandler(tornado.web.RequestHandler):
-    # Location for downloading file from the long term storage
+    """Handle requests to the `store` endpoint.
+    """
 
     def read_data(self, hash_value):
+        """Read data from the permanent S3 bucket
+
+        Arguments:
+            hash_value {str} -- UUID of requested payload
+        """
         with NamedTemporaryFile(delete=False) as tmp:
             filename = tmp.name
             logger.info('Read from S3: ' + hash_value)
@@ -205,6 +270,10 @@ class StaticFileHandler(tornado.web.RequestHandler):
         return filename
 
     def get(self):
+        """handle GET requests to `store` endpoint
+
+        Deliver payload to requesting client
+        """
         hash_value = self.request.uri.split('/')[4]
         filename = self.read_data(hash_value)
         buf_size = 4096
@@ -222,8 +291,12 @@ class StaticFileHandler(tornado.web.RequestHandler):
 
 
 class VersionHandler(tornado.web.RequestHandler):
+    """Handler for the `version` endpoint
+    """
 
     def get(self):
+        """Handle GET request to the `version` endpoint
+        """
         response = {'version': '0.0.1'}
         self.write(response)
 
