@@ -86,11 +86,17 @@ def handle_file(msgs):
         result = msg['validation']
 
         if result == 'success':
-            url = storage.transfer(hash_, QUARANTINE, PERM)
-            produce('available', {'url': url})
+            if storage.object_info(hash_, QUARANTINE):
+                url = storage.transfer(hash_, QUARANTINE, PERM)
+                produce('available', {'url': url})
+            else:
+                logger.info('Object does not exist')
         if result == 'failure':
-            logger.info(hash_ + ' rejected')
-            url = storage.transfer(hash_, QUARANTINE, REJECT)
+            if storage.object_info(hash_, QUARANTINE):
+                logger.info(hash_ + ' rejected')
+                url = storage.transfer(hash_, QUARANTINE, REJECT)
+            else:
+                logger.info('Object does not exist')
 
 
 @tornado.gen.coroutine
