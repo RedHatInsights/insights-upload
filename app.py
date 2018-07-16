@@ -17,6 +17,7 @@ from utils import storage
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('upload-service')
 
+# Upload content type must match this regex. Third field matches end service
 content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 
 # set max length to 10.5 MB (one MB larger than peak)
@@ -31,13 +32,12 @@ values = {'principle': 'dumdum',
           'rh_account': '123456'}
 
 # S3 buckets
-QUARANTINE = os.getenv('S3_QUARANTINE')
-PERM = os.getenv('S3_PERM')
-REJECT = os.getenv('S3_REJECT')
+QUARANTINE = os.getenv('S3_QUARANTINE', 'insights-upload-quarantine')
+PERM = os.getenv('S3_PERM', 'insights-upload-perm-test')
+REJECT = os.getenv('S3_REJECT', 'insights-upload-rejected')
 
-MQ = os.getenv('KAFKAMQ', 'kafka.cmitchel-msgq-test.svc').split(',')
-
-ROUTE = os.getenv('ROUTE', 'http://localhost:8888')
+# Message Queue
+MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 
 # message queues
 mqp = clients.Producer(MQ)
