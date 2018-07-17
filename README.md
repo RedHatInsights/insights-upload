@@ -15,7 +15,7 @@ services of new and available payloads for processing.
 The service runs in Openshift Dedicated.
 
 ## Getting Started
-The local development environmnet is configured using docker and docker-compose.
+The local development environment is configured using docker and docker-compose.
 The docker-compose file included in this repo will stand up a message queue, the
 upload-service app, and a consumer for a test queue. It is currently configured
 to simply fail all validations and send them to the rejected bucket. For testing,
@@ -42,14 +42,16 @@ variables:
 ### Installing
 Once your environment variables are set on your localhost, bring up the stack:
 
-    sudo -E docker-compose up
+    cd ./docker && sudo -E docker-compose up
 
 Use the `-d` switch if you want to background the logging
-
 
 Upload an insights archive file to test to see if the system is working properly:
 
     curl -vvvv -F "upload=@test-archive.tar.gz;type=application/vnd.redhat.testareno.something+tgz" localhost:8080/api/v1/upload
+
+**NOTE**: The service **testareno** is important for local testing as it's the service queue
+that our test consumer is listening to.
 
 You should see messages in the docker logs where the upload-service sends a message,
 the consumer picks it up, returns a failure message, then the upload-service sends it to
