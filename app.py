@@ -10,6 +10,7 @@ from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
 from kiel import clients, exc
+from time import sleep
 
 from utils import storage
 
@@ -68,6 +69,7 @@ def consume():
         while True:
             msgs = yield mqc.consume('uploadvalidation')
             if msgs:
+                logger.info('recieved message')
                 handle_file(msgs)
     except exc.NoBrokersError:
         logger.error('Consume Failure: No Brokers Available')
@@ -84,14 +86,15 @@ def handle_file(msgs):
     for msg in msgs:
         hash_ = msg['hash']
         result = msg['validation']
-
-        if result == 'success':
+        logger.info('processing message: %s - %s' % (hash_, result))
+        if result.lower() == 'success':
             if storage.object_info(hash_, QUARANTINE):
                 url = storage.transfer(hash_, QUARANTINE, PERM)
+                logger.info(url)
                 produce('available', {'url': url})
             else:
                 logger.info('Object does not exist')
-        if result == 'failure':
+        if result.lower() == 'failure':
             if storage.object_info(hash_, QUARANTINE):
                 logger.info(hash_ + ' rejected')
                 url = storage.transfer(hash_, QUARANTINE, REJECT)
@@ -243,6 +246,7 @@ app = tornado.web.Application(endpoints)
 
 
 if __name__ == "__main__":
+    sleep(10)
     app.listen(LISTEN_PORT)
     loop = tornado.ioloop.IOLoop.current()
     loop.add_callback(consume)

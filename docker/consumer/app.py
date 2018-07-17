@@ -1,33 +1,64 @@
 import json
-import time
+import logging
 
-from kiel import clients, exc
+from time import sleep
+from confluent_kafka import Consumer, Producer, KafkaError
 
-MQ = 'kafka:29092'
+# configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger('test-consumer')
 
-mqp = clients.Producer([MQ])
-mqc = clients.SingleConsumer([MQ])
+logger.info('connecting...')
 
+c = Consumer({
+    'bootstrap.servers': 'kafka:29092',
+    'group.id': 'testgroup',
+    'default.topic.config': {
+        'auto.offset.reset': 'smallest'
+    }
+})
 
-def main():
-    try:
-        while True:
-            time.sleep(10)
+c.subscribe(['testareno'])
 
-            mqc.connect()
-            mqp.connect()
-
-            try:
-                msgs = yield mqc.consume('testareno')
-                if msgs:
-                    for msg in msgs:
-                        print(msg)
-                    mqp.produce('uploadvalidation', json.dumps({'validation': 'Success'}))
-            except exc.NoBrokersError:
-                continue
-    except KeyboardInterrupt:
-        print('Exiting: Keyboard Interrupt')
+p = Producer({'bootstrap.servers': 'kafka:29092'})
 
 
-if __name__ == '__main__':
-    main()
+def delivery_report(err, msg):
+    """ Called once for each message produced to indicate delivery result.
+        Triggered by poll() or flush(). """
+    if err is not None:
+        logger.info('Message delivery failed: {}'.format(err))
+    else:
+        logger.info('Message delivered to {} [{}]'.format(msg.topic(), msg.partition()))
+
+
+logger.info("Entering message processing loop.")
+
+
+while True:
+    msg = c.poll(1.0)
+
+    if msg is None:
+        continue
+    if msg.error():
+        if msg.error().code() == KafkaError._PARTITION_EOF:
+            continue
+        else:
+            print(msg.error())
+            break
+
+    logger.info('Received message: {}'.format(msg.value().decode('utf-8')))
+
+    result = json.loads(json.loads(msg.value().decode('utf-8')))
+
+    validation = {
+        'hash': result['hash'],
+        'validation': 'success'
+    }
+
+    sleep(10)  # Mock file verification and validation
+    logger.info('Replying with: {}'.format(json.dumps(validation)))
+
+    p.poll(0)
+    p.produce('uploadvalidation', json.dumps(validation), callback=delivery_report)
+    p.flush()
