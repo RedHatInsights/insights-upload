@@ -237,7 +237,7 @@ class VersionHandler(tornado.web.RequestHandler):
 
 
 endpoints = [
-    (r"/api/v1/", RootHandler),
+    (r"/", RootHandler),
     (r"/api/v1/version", VersionHandler),
     (r"/api/v1/upload", UploadHandler),
 ]
