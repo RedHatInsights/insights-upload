@@ -7,6 +7,9 @@ import app
 
 client = AsyncHTTPClient()
 
+with open('VERSION', 'rb') as f:
+    VERSION = f.read()
+
 # Build HTTP Request so that Tornado can recognize and use the payload test
 files = {"upload": ('payload.tar.gz', open('./tests/payload.tar.gz', 'rb'),
          'application/vnd.redhat.advisor.payload+tgz')}
@@ -45,4 +48,4 @@ class TestEndpoints(AsyncHTTPTestCase):
     def test_version(self):
         response = yield self.http_client.fetch(self.get_url('/api/v1/version'), method='GET')
         self.assertEqual(response.code, 200)
-        self.assertEqual(response.body, b'{"version": "0.0.1"}')
+        self.assertEqual(response.body, b'{"version": "%s"}' % VERSION)

@@ -44,6 +44,9 @@ MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 mqp = clients.Producer(MQ)
 mqc = clients.SingleConsumer(MQ)
 
+with open('VERSION', 'r') as f:
+    VERSION = f.read()
+
 
 def split_content(content):
     """Split the content-type to find the service name
@@ -104,7 +107,7 @@ def handle_file(msgs):
 
 @tornado.gen.coroutine
 def produce(topic, msg):
-    """Proce a message to a given topic on the MQ
+    """Produce a message to a given topic on the MQ
 
     Arguments:
         topic {str} -- The service name to notify
@@ -232,7 +235,7 @@ class VersionHandler(tornado.web.RequestHandler):
     def get(self):
         """Handle GET request to the `version` endpoint
         """
-        response = {'version': '0.0.1'}
+        response = {'version': VERSION}
         self.write(response)
 
 

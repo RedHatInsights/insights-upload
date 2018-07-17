@@ -10,7 +10,7 @@ info:
     email: sadams@redhat.com
 
 paths:
-  /api/v1:
+  /:
     get:
       description: |
         Liveliness
@@ -19,6 +19,16 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/MessageBody'
+    options:
+      description: |
+        Add allowed methods header
+      responses:
+        200:
+          description: OK
+          headers:
+            Allow:
+              type: string
+              description: 'GET, HEAD, OPTIONS'
   /api/v1/upload:
     get:
       description: |
@@ -52,6 +62,8 @@ paths:
     get:
       description: |
         Display API version
+      produces:
+        application/json
       responses:
         200:
           description: OK
