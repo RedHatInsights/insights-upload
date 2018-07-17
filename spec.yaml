@@ -1,5 +1,5 @@
 swagger: "2.0"
-basePath: /api/v1
+basePath: /
 schemes:
     - https
 info:
@@ -10,7 +10,7 @@ info:
     email: sadams@redhat.com
 
 paths:
-  /:
+  /api/v1:
     get:
       description: |
         Liveliness
@@ -19,7 +19,7 @@ paths:
           description: OK
           schema:
             $ref: '#/definitions/MessageBody'
-  /upload:
+  /api/v1/upload:
     get:
       description: |
         Display accepted content-type
@@ -48,7 +48,7 @@ paths:
             Allow:
               type: string
               description: 'GET, POST, HEAD, OPTIONS'
-  /version:
+  /api/v1/version:
     get:
       description: |
         Display API version
