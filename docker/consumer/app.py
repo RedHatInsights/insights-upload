@@ -53,7 +53,7 @@ while True:
 
     validation = {
         'hash': result['hash'],
-        'validation': 'success'
+        'validation': 'failure'
     }
 
     sleep(10)  # Mock file verification and validation
