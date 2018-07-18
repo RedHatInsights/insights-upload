@@ -45,16 +45,16 @@ variables:
 
 Once your environment variables are set on your localhost, bring up the stack:
 
-    cd ./docker && sudo -E docker-compose up
+    LINUX
+    cd ./docker && sh startup.sh
 
-Use the `-d` switch if you want to background the logging
+    WINDOWS
+    cd .\docker
+    .\startup.ps1
 
-You also need to stage the topics in the kafka server. You can do this with the
-included script:
-
-    sh docker/consumer/add-topics.sh
-
-Upload an insights archive file to test to see if the system is working properly:
+Upload a file to test to see if the system is working properly. Any file will
+work in testing as long as the `type` field is set properly. Use the `README.md`
+file in this repo if you'd like.
 
     curl -vvvv -F "upload=@test-archive.tar.gz;type=application/vnd.redhat.testareno.something+tgz" localhost:8080/api/v1/upload
 
@@ -64,6 +64,10 @@ that our test consumer is listening to.
 You should see messages in the docker logs where the upload-service sends a message,
 the consumer picks it up, returns a failure message, then the upload-service sends it to
 the permanent bucket.
+
+To see the docker-compose logs:
+
+    sudo docker-compose logs -f
 
 ## Running with Tests
 
