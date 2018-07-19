@@ -85,19 +85,19 @@ def handle_file(msgs):
         hash_ = msg['hash']
         result = msg['validation']
         logger.info('processing message: %s - %s' % (hash_, result))
-        if result.lower() == 'success':
-            if storage.ls(storage.QUARANTINE, hash_):
+        object_exists = yield storage.ls(storage.QUARANTINE, hash_)
+        if object_exists:
+            if result.lower() == 'success':
                 url = storage.copy(storage.QUARANTINE, storage.PERM, hash_)
                 logger.info(url)
                 produce('available', {'url': url})
-            else:
-                logger.info('Object does not exist')
-        if result.lower() == 'failure':
-            if storage.ls(storage.QUARANTINE, hash_):
+            elif result.lower() == 'failure':
                 logger.info(hash_ + ' rejected')
                 url = storage.copy(storage.QUARANTINE, storage.REJECT, hash_)
             else:
-                logger.info('Object does not exist')
+                logger.info('Unrecognized result: ' + result.lower())
+        else:
+            logger.info('Object does not exist')
 
 
 @tornado.gen.coroutine
