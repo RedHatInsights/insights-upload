@@ -12,7 +12,7 @@ from tornado.concurrent import run_on_executor
 from kiel import clients, exc
 from time import sleep
 
-from utils import storage
+from utils import s3 as storage
 
 # Logging
 logging.basicConfig(level=logging.WARNING)
@@ -31,11 +31,6 @@ MAX_WORKERS = int(os.getenv('MAX_WORKERS', 10))
 # these are dummy values since we can't yet get a principle or rh_account
 values = {'principle': 'dumdum',
           'rh_account': '123456'}
-
-# S3 buckets
-QUARANTINE = os.getenv('S3_QUARANTINE', 'insights-upload-quarantine')
-PERM = os.getenv('S3_PERM', 'insights-upload-perm-test')
-REJECT = os.getenv('S3_REJECT', 'insights-upload-rejected')
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
@@ -91,16 +86,16 @@ def handle_file(msgs):
         result = msg['validation']
         logger.info('processing message: %s - %s' % (hash_, result))
         if result.lower() == 'success':
-            if storage.object_info(hash_, QUARANTINE):
-                url = storage.transfer(hash_, QUARANTINE, PERM)
+            if storage.ls(storage.QUARANTINE, hash_):
+                url = storage.copy(storage.QUARANTINE, storage.PERM, hash_)
                 logger.info(url)
                 produce('available', {'url': url})
             else:
                 logger.info('Object does not exist')
         if result.lower() == 'failure':
-            if storage.object_info(hash_, QUARANTINE):
+            if storage.ls(storage.QUARANTINE, hash_):
                 logger.info(hash_ + ' rejected')
-                url = storage.transfer(hash_, QUARANTINE, REJECT)
+                url = storage.copy(storage.QUARANTINE, storage.REJECT, hash_)
             else:
                 logger.info('Object does not exist')
 
@@ -188,7 +183,7 @@ class UploadHandler(tornado.web.RequestHandler):
         Returns:
             str -- done. used to notify upload service to send to MQ
         """
-        url = storage.upload_to_s3(filename, QUARANTINE, self.hash_value)
+        url = storage.write(filename, storage.QUARANTINE, self.hash_value)
         os.remove(filename)
         return url
 
@@ -209,14 +204,14 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             service = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
-            result = yield self.write_data()
+            response, filename = yield self.write_data()
             values['hash'] = self.hash_value
-            self.set_status(result[0]['status'][0], result[0]['status'][1])
+            self.set_status(response['status'][0], response['status'][1])
             self.finish()
-            url = yield self.upload(result[1])
+            url = yield self.upload(filename)
             logger.info(url)
             values['url'] = url
-            while not storage.object_info(self.hash_value, QUARANTINE):
+            while not storage.ls(self.hash_value, storage.QUARANTINE):
                 pass
             else:
                 logger.info('upload id: ' + self.hash_value)
