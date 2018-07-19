@@ -27,7 +27,7 @@ def write(data, dest, uuid):
 def copy(src, dest, uuid):
     copy_src = {'Bucket': src,
                 'Key': uuid}
-    s3.copy(copy_src, dest, copy_src['Key'])
+    s3.copy(copy_src, dest, uuid)
     s3.delete_object(Bucket=src, Key=uuid)
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
