@@ -35,4 +35,4 @@ def copy(src, dest, uuid):
 
 def ls(src, uuid):
     head_object = s3.head_object(Bucket=src, Key=uuid)
-    return head_object
+    return head_object['VersionId']
