@@ -1,8 +1,6 @@
 import boto3
 import os
 
-from botocore.exceptions import ClientError
-
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', None)
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', None)
 
@@ -36,8 +34,5 @@ def copy(src, dest, uuid):
 
 
 def ls(src, uuid):
-    try:
-        s3.head_object(Bucket=src, Key=uuid)
-        return True
-    except ClientError:
-        return False
+    head_object = s3.head_object(Bucket=src, Key=uuid)
+    return head_object
