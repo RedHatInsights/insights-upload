@@ -15,7 +15,7 @@ from time import sleep
 from utils import s3 as storage
 
 # Logging
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger('upload-service')
 
 # Upload content type must match this regex. Third field matches end service
