@@ -67,7 +67,7 @@ def consume():
         while True:
             msgs = yield mqc.consume('uploadvalidation')
             if msgs:
-                logger.debug('recieved message')
+                logger.info('recieved message')
                 handle_file(msgs)
     except exc.NoBrokersError:
         logger.error('Consume Failure: No Brokers Available')
@@ -84,20 +84,20 @@ def handle_file(msgs):
     for msg in msgs:
         hash_ = msg['hash']
         result = msg['validation']
-        logger.debug('processing message: %s - %s' % (hash_, result))
+        logger.info('processing message: %s - %s' % (hash_, result))
         if result.lower() == 'success':
             if storage.ls(storage.QUARANTINE, hash_):
                 url = storage.copy(storage.QUARANTINE, storage.PERM, hash_)
-                logger.debug(url)
+                logger.info(url)
                 produce('available', {'url': url})
             else:
-                logger.debug('Object does not exist')
+                logger.info('Object does not exist')
         if result.lower() == 'failure':
             if storage.ls(storage.QUARANTINE, hash_):
-                logger.debug(hash_ + ' rejected')
+                logger.info(hash_ + ' rejected')
                 url = storage.copy(storage.QUARANTINE, storage.REJECT, hash_)
             else:
-                logger.debug('Object does not exist')
+                logger.info('Object does not exist')
 
 
 @tornado.gen.coroutine
@@ -195,7 +195,7 @@ class UploadHandler(tornado.web.RequestHandler):
         message to MQ
         """
         if not self.request.files.get('upload'):
-            logger.debug('Upload field not found')
+            logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
             self.finish()
         invalid = self.upload_validation()
@@ -209,12 +209,12 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(response['status'][0], response['status'][1])
             self.finish()
             url = yield self.upload(filename)
-            logger.debug(url)
+            logger.info(url)
             values['url'] = url
-            while not storage.ls(self.hash_value, storage.QUARANTINE):
+            while not storage.ls(storage.QUARANTINE, self.hash_value):
                 pass
             else:
-                logger.debug('upload id: ' + self.hash_value)
+                logger.info('upload id: ' + self.hash_value)
                 yield produce(service, values)
 
     def options(self):
