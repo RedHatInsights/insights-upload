@@ -173,7 +173,7 @@ class UploadHandler(tornado.web.RequestHandler):
         return response, filename
 
     @run_on_executor
-    def upload(self, filename, datastore):
+    def upload(self, filename):
         """Upload the payload to S3 Quarantine Bucket
 
         Arguments:
