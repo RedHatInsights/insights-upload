@@ -15,7 +15,7 @@ from time import sleep
 from utils import s3 as storage
 
 # Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger('upload-service')
 
 # Upload content type must match this regex. Third field matches end service
@@ -85,19 +85,15 @@ def handle_file(msgs):
         hash_ = msg['hash']
         result = msg['validation']
         logger.info('processing message: %s - %s' % (hash_, result))
-        object_exists = yield storage.ls(storage.QUARANTINE, hash_)
-        if object_exists:
-            if result.lower() == 'success':
-                url = storage.copy(storage.QUARANTINE, storage.PERM, hash_)
-                logger.info(url)
-                produce('available', {'url': url})
-            elif result.lower() == 'failure':
-                logger.info(hash_ + ' rejected')
-                url = storage.copy(storage.QUARANTINE, storage.REJECT, hash_)
-            else:
-                logger.info('Unrecognized result: ' + result.lower())
+        if result.lower() == 'success':
+            url = storage.copy(storage.QUARANTINE, storage.PERM, hash_)
+            logger.info(url)
+            produce('available', {'url': url})
+        elif result.lower() == 'failure':
+            logger.info(hash_ + ' rejected')
+            url = storage.copy(storage.QUARANTINE, storage.REJECT, hash_)
         else:
-            logger.info('Object does not exist')
+            logger.info('Unrecognized result: ' + result.lower())
 
 
 @tornado.gen.coroutine
@@ -158,8 +154,8 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @run_on_executor
     def write_data(self):
-        """Writes the uploaded date to a tmp file in prepartion for upload to
-           S3
+        """Writes the uploaded date to a tmp file in prepartion for writing to
+           storage
 
            Returns:
                 dict -- status tuple containing error code and message
@@ -174,7 +170,7 @@ class UploadHandler(tornado.web.RequestHandler):
 
     @run_on_executor
     def upload(self, filename):
-        """Upload the payload to S3 Quarantine Bucket
+        """Write the payload to the configured storage
 
         Arguments:
             filename {str} -- The filename to upload. Should be the tmpfile
@@ -191,7 +187,7 @@ class UploadHandler(tornado.web.RequestHandler):
     def post(self):
         """Handle POST requests to the upload endpoint
 
-        Validate upload, get service name, create UUID, upload to S3, and send
+        Validate upload, get service name, create UUID, write to storage, and send
         message to MQ
         """
         if not self.request.files.get('upload'):
