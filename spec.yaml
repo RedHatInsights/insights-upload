@@ -63,7 +63,7 @@ paths:
       description: |
         Display API version
       produces:
-        application/json
+        - application/json
       responses:
         200:
           description: OK
