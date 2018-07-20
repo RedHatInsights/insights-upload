@@ -1,6 +1,8 @@
 #!/bin/bash
 
-sudo -E docker-compose up -d
+sudo -E docker-compose up --build -d
+
+sleep 5
 
 sudo docker-compose exec kafka \
 kafka-topics --create --topic advisor --partitions 1 --replication-factor 1 --if-not-exists --zookeeper zookeeper:32181
