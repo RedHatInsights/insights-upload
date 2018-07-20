@@ -143,7 +143,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
             error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + MAX_LENGTH + ' bytes')
             return error
-        if re.search(content_regex, self.request.headers['Content-Type']) is None:
+        if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
             error = (415, 'Unsupported Media Type')
             return error
 
@@ -198,7 +198,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if invalid:
             self.set_status(invalid[0], invalid[1])
         else:
-            service = split_content(self.request.headers['Content-Type'])
+            service = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
             response, filename = yield self.write_data()
             values['hash'] = self.hash_value
