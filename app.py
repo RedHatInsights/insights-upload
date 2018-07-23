@@ -13,9 +13,10 @@ from kiel import clients, exc
 from time import sleep
 
 from utils import s3 as storage
+from utils import mnm
 
 # Logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=os.getenv("LOGLEVEL", "WARNING"))
 logger = logging.getLogger('upload-service')
 
 # Upload content type must match this regex. Third field matches end service
@@ -28,9 +29,13 @@ LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
 # Maximum workers for threaded execution
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 10))
 
-# these are dummy values since we can't yet get a principle or rh_account
-values = {'principle': 'dumdum',
-          'rh_account': '123456'}
+# these are dummy values since we can't yet get a principal or rh_account
+values = {'principal': 'default_principle',
+          'rh_account': '000001',
+          'hash': 'abcdef123456',
+          'url': 'http://defaulttesturl',
+          'validation': 0,
+          'size': 0}
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
@@ -201,12 +206,15 @@ class UploadHandler(tornado.web.RequestHandler):
             service = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
             response, filename = yield self.write_data()
+            values['validation'] = 1
             values['hash'] = self.hash_value
+            values['size'] = int(self.request.headers['Content-Length'])
             self.set_status(response['status'][0], response['status'][1])
             self.finish()
             url = yield self.upload(filename)
             logger.info(url)
             values['url'] = url
+            mnm.send_to_influxdb(values)
             while not storage.ls(storage.QUARANTINE, self.hash_value):
                 pass
             else:
