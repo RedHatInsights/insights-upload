@@ -12,7 +12,7 @@ from tornado.concurrent import run_on_executor
 from kiel import clients, exc
 from time import sleep
 
-from utils import s3 as storage
+from utils.storage import s3 as storage
 from utils import mnm
 
 # Logging
@@ -30,7 +30,7 @@ LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 10))
 
 # these are dummy values since we can't yet get a principal or rh_account
-values = {'principal': 'default_principle',
+values = {'principal': 'default_principal',
           'rh_account': '000001',
           'hash': 'abcdef123456',
           'url': 'http://defaulttesturl',
@@ -209,6 +209,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['validation'] = 1
             values['hash'] = self.hash_value
             values['size'] = int(self.request.headers['Content-Length'])
+            values['service'] = service
             self.set_status(response['status'][0], response['status'][1])
             self.finish()
             url = yield self.upload(filename)
