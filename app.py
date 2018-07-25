@@ -211,6 +211,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['size'] = int(self.request.headers['Content-Length'])
             values['service'] = service
             self.set_status(response['status'][0], response['status'][1])
+            self.add_header('uuid', self.hash_value)
             self.finish()
             url = yield self.upload(filename)
             logger.info(url)
@@ -245,7 +246,7 @@ endpoints = [
     (r"/api/v1/upload", UploadHandler),
 ]
 
-app = tornado.web.Application(endpoints)
+app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
 
 
 if __name__ == "__main__":
