@@ -146,7 +146,7 @@ class UploadHandler(tornado.web.RequestHandler):
             tuple -- status code and a user friendly message
         """
         if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
-            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + MAX_LENGTH + ' bytes')
+            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + str(MAX_LENGTH) + ' bytes')
             return error
         if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
             error = (415, 'Unsupported Media Type')
