@@ -217,6 +217,7 @@ class UploadHandler(tornado.web.RequestHandler):
             logger.info(url)
             values['url'] = url
             mnm.send_to_influxdb(values)
+            logger.info(values)
             while not storage.ls(storage.QUARANTINE, self.hash_value):
                 pass
             else:
