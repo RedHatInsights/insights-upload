@@ -21,7 +21,7 @@ def write(data, dest, uuid):
     with open('/tmp/uploads/' + dest + '/' + uuid, 'w') as f:
         f.write(data)
         url = f
-    return url
+    return url.name
 
 
 def ls(src, uuid):
