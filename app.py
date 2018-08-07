@@ -16,7 +16,7 @@ from utils.storage import s3 as storage
 from utils import mnm
 
 # Logging
-logging.basicConfig(level=os.getenv("LOGLEVEL", "WARNING"))
+logging.basicConfig(level=os.getenv("LOGLEVEL", "INFO"))
 logger = logging.getLogger('upload-service')
 
 # Upload content type must match this regex. Third field matches end service
