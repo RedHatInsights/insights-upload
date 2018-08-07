@@ -9,8 +9,11 @@ import logging
 from tempfile import NamedTemporaryFile
 from concurrent.futures import ThreadPoolExecutor
 from tornado.concurrent import run_on_executor
+from tornado.ioloop import IOLoop
+from tornado.queues import Queue, QueueFull
+from tornado.locks import Event
 from kiel import clients, exc
-from time import sleep
+from time import time, sleep
 
 from utils.storage import s3 as storage
 from utils import mnm
@@ -44,6 +47,10 @@ MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 mqp = clients.Producer(MQ)
 mqc = clients.SingleConsumer(MQ)
 
+# local queue for pushing items into kafka, this queue fills up if kafka goes down
+produce_queue = Queue(maxsize=999)
+
+
 with open('VERSION', 'r') as f:
     VERSION = f.read()
 
@@ -61,20 +68,72 @@ def split_content(content):
     return service
 
 
-async def consume():
-    """Connect to the message queue and consume messages from
-       the 'uploadvalidation' queue
+@tornado.gen.coroutine
+async def consumer():
+    """Consume indefinitely from the 'uploadvalidation' queue.
     """
-    await mqc.connect()
+    connected = False
+    while True:
+        # If not connected, attempt to connect...
+        if not connected:
+            try:
+                logger.info("Consume client not connected, attempting to connect...")
+                await mqc.connect()
+                logger.info("Consumer client connected!")
+                connected = True
+            except exc.NoBrokersError:
+                logger.error('Consume client connect failed: No Brokers Available')
+                await tornado.gen.Task(IOLoop.current().add_timeout, time() + 5)
+                continue
 
-    try:
-        while True:
+        # Consume
+        try:
             msgs = await mqc.consume('uploadvalidation')
             if msgs:
                 logger.info('recieved message')
                 handle_file(msgs)
-    except exc.NoBrokersError:
-        logger.error('Consume Failure: No Brokers Available')
+        except exc.NoBrokersError:
+            logger.error('Consume Failed: No Brokers Available')
+            connected = False
+
+
+async def producer():
+    """Produce items sitting in our local produce_queue to kafka
+
+    An item is a dict with keys 'topic' and 'msg', which contain:
+        topic {str} -- The service name to notify
+        msg {dict} -- JSON containing a rh_account, principal, payload hash,
+                        and url for download
+    """
+    connected = False
+    while True:
+        # If not connected to kafka, attempt to connect...
+        if not connected:
+            try:
+                logger.info("Producer client not connected, attempting to connect...")
+                await mqp.connect()
+                logger.info("Producer client connected!")
+                connected = True
+            except exc.NoBrokersError:
+                logger.error('Producer client connect failed: No Brokers Available')
+                await tornado.gen.Task(IOLoop.current().add_timeout, time() + 5)
+                continue
+
+        # Pull item off our queue to produce
+        item = await produce_queue.get()
+        topic = item['topic']
+        msg = item['msg']
+        try:
+            await mqp.produce(topic, json.dumps(msg))
+            logger.info("Produced on topic %s: %s", topic, msg)
+        except exc.NoBrokersError:
+            logger.error('Produce Failed: No Brokers Available')
+            connected = False
+            # Put the item back on the queue so we can push it when we reconnect
+            try:
+                await produce_queue.put_nowait(item)
+            except QueueFull:
+                logger.error('Producer queue is full, item dropped')
 
 
 async def handle_file(msgs):
@@ -91,27 +150,17 @@ async def handle_file(msgs):
         if result.lower() == 'success':
             url = storage.copy(storage.QUARANTINE, storage.PERM, hash_)
             logger.info(url)
-            produce('available', {'url': url})
+            await produce_queue.put(
+                {
+                    'topic': 'available',
+                    'msg': {'url': url}
+                }
+            )
         elif result.lower() == 'failure':
             logger.info(hash_ + ' rejected')
             url = storage.copy(storage.QUARANTINE, storage.REJECT, hash_)
         else:
             logger.info('Unrecognized result: ' + result.lower())
-
-
-async def produce(topic, msg):
-    """Produce a message to a given topic on the MQ
-
-    Arguments:
-        topic {str} -- The service name to notify
-        msg {dict} -- JSON containing a rh_account, principal, payload hash,
-                        and url for download
-    """
-    await mqp.connect()
-    try:
-        await mqp.produce(topic, json.dumps(msg))
-    except exc.NoBrokersError:
-        logger.error('Produce Failed: No Brokers Available')
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -211,12 +260,11 @@ class UploadHandler(tornado.web.RequestHandler):
             logger.info(url)
             values['url'] = url
             mnm.send_to_influxdb(values)
-            logger.info(values)
             while not storage.ls(storage.QUARANTINE, self.hash_value):
                 pass
             else:
                 logger.info('upload id: ' + self.hash_value)
-                await produce(service, values)
+                await produce_queue.put({'topic': service, 'msg': values})
 
     def options(self):
         """Handle OPTIONS request to upload endpoint
@@ -244,12 +292,17 @@ endpoints = [
 app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
 
 
-if __name__ == "__main__":
+def main():
     sleep(10)
     app.listen(LISTEN_PORT)
-    loop = tornado.ioloop.IOLoop.current()
-    loop.add_callback(consume)
+    loop = IOLoop.current()
+    loop.add_callback(consumer)
+    loop.add_callback(producer)
     try:
         loop.start()
     except KeyboardInterrupt:
         loop.stop()
+
+
+if __name__ == "__main__":
+    main()
