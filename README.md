@@ -15,6 +15,25 @@ services of new and available payloads for processing.
 
 The service runs in Openshift Dedicated.
 
+## How it Works
+
+The upload service workflow is as follows:
+
+    client > upload service > service topic on the MQ > validating service >
+    uploadvalidation topic on the MQ with result >
+    URL for permanent file location added to `available` topic on the MQ >
+    Other service consume the `available` topic
+
+The key here for most services is to understand that in order to be notified
+of new, validated payloads, they **must** subscribe to the `available` topic on the message
+queue.
+
+### Errors
+
+The upload service will report back to the client HTTP errors if something goes
+wrong. It will be the responsibility of the client to communicate that connection
+problem back to the user via a log message or some other means.
+
 ## Getting Started
 
 The local development environment is configured using docker and docker-compose.
