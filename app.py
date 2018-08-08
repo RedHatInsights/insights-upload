@@ -131,7 +131,7 @@ async def producer():
             connected = False
             # Put the item back on the queue so we can push it when we reconnect
             try:
-                await produce_queue.put_nowait(item)
+                produce_queue.put_nowait(item)
             except QueueFull:
                 logger.error('Producer queue is full, item dropped')
 
