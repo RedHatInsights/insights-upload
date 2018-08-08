@@ -61,16 +61,15 @@ def split_content(content):
     return service
 
 
-@tornado.gen.coroutine
-def consume():
+async def consume():
     """Connect to the message queue and consume messages from
        the 'uploadvalidation' queue
     """
-    yield mqc.connect()
+    await mqc.connect()
 
     try:
         while True:
-            msgs = yield mqc.consume('uploadvalidation')
+            msgs = await mqc.consume('uploadvalidation')
             if msgs:
                 logger.info('recieved message')
                 handle_file(msgs)
@@ -78,8 +77,7 @@ def consume():
         logger.error('Consume Failure: No Brokers Available')
 
 
-@tornado.gen.coroutine
-def handle_file(msgs):
+async def handle_file(msgs):
     """Determine which bucket to put a payload in based on the message
        returned from the validating service.
 
@@ -101,8 +99,7 @@ def handle_file(msgs):
             logger.info('Unrecognized result: ' + result.lower())
 
 
-@tornado.gen.coroutine
-def produce(topic, msg):
+async def produce(topic, msg):
     """Produce a message to a given topic on the MQ
 
     Arguments:
@@ -110,9 +107,9 @@ def produce(topic, msg):
         msg {dict} -- JSON containing a rh_account, principal, payload hash,
                         and url for download
     """
-    yield mqp.connect()
+    await mqp.connect()
     try:
-        yield mqp.produce(topic, json.dumps(msg))
+        await mqp.produce(topic, json.dumps(msg))
     except exc.NoBrokersError:
         logger.error('Produce Failed: No Brokers Available')
 
@@ -157,8 +154,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
-    @run_on_executor
-    def write_data(self):
+    async def write_data(self):
         """Writes the uploaded date to a tmp file in prepartion for writing to
            storage
 
@@ -173,8 +169,7 @@ class UploadHandler(tornado.web.RequestHandler):
         response = {'status': (202, 'Accepted')}
         return response, filename
 
-    @run_on_executor
-    def upload(self, filename):
+    async def upload(self, filename):
         """Write the payload to the configured storage
 
         Arguments:
@@ -188,8 +183,7 @@ class UploadHandler(tornado.web.RequestHandler):
         os.remove(filename)
         return url
 
-    @tornado.gen.coroutine
-    def post(self):
+    async def post(self):
         """Handle POST requests to the upload endpoint
 
         Validate upload, get service name, create UUID, write to storage, and send
@@ -205,7 +199,7 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             service = split_content(self.request.files['upload'][0]['content_type'])
             self.hash_value = uuid.uuid4().hex
-            response, filename = yield self.write_data()
+            response, filename = await self.write_data()
             values['validation'] = 1
             values['hash'] = self.hash_value
             values['size'] = int(self.request.headers['Content-Length'])
@@ -213,7 +207,7 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(response['status'][0], response['status'][1])
             self.add_header('uuid', self.hash_value)
             self.finish()
-            url = yield self.upload(filename)
+            url = await self.upload(filename)
             logger.info(url)
             values['url'] = url
             mnm.send_to_influxdb(values)
@@ -222,7 +216,7 @@ class UploadHandler(tornado.web.RequestHandler):
                 pass
             else:
                 logger.info('upload id: ' + self.hash_value)
-                yield produce(service, values)
+                await produce(service, values)
 
     def options(self):
         """Handle OPTIONS request to upload endpoint
