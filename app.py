@@ -68,7 +68,6 @@ def split_content(content):
     return service
 
 
-@tornado.gen.coroutine
 async def consumer():
     """Consume indefinitely from the 'uploadvalidation' queue.
     """
