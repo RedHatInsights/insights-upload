@@ -7,11 +7,8 @@ import json
 import logging
 
 from tempfile import NamedTemporaryFile
-from concurrent.futures import ThreadPoolExecutor
-from tornado.concurrent import run_on_executor
 from tornado.ioloop import IOLoop
 from tornado.queues import Queue, QueueFull
-from tornado.locks import Event
 from kiel import clients, exc
 from time import time, sleep
 
@@ -181,9 +178,6 @@ class UploadHandler(tornado.web.RequestHandler):
     """Handles requests to the upload endpoint
     """
 
-    # * Setup the thread pool for backgrounding the upload process
-    executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
-
     def upload_validation(self):
         """Validate the upload using general criteria
 
@@ -282,10 +276,31 @@ class VersionHandler(tornado.web.RequestHandler):
         self.write(response)
 
 
+class StatusHandler(tornado.web.RequestHandler):
+
+    def get(self):
+
+        response = {"upload-service: ": "up",
+                    "message queue: ": "down",
+                    "Long Term Storage: ": "down",
+                    "Quarantine Storage: ": "down",
+                    "Rejected Storage: ": "down"}
+
+        if storage.up_check(storage.PERM):
+            response['Long Term Storage: '] = "up"
+        if storage.up_check(storage.QUARANTINE):
+            response['Quarantine Storage: '] = "up"
+        if storage.up_check(storage.REJECT):
+            response['Rejected Storage: '] = "up"
+
+        self.write(response)
+
+
 endpoints = [
     (r"/", RootHandler),
     (r"/api/v1/version", VersionHandler),
     (r"/api/v1/upload", UploadHandler),
+    (r"/api/v1/status", StatusHandler),
 ]
 
 app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)

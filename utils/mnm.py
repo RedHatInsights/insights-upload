@@ -26,7 +26,6 @@ def send_to_influxdb(values):
     data = """
     upload_stats,account_number={account},namespace={namespace} size={size}
     upload_stats,account_number={account},namespace={namespace} validation={validation}
-    upload_stats,account_number={account},namespace={namespace} service_validation={svc_validation}
     """.format(**values)
 
     try:
