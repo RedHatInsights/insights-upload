@@ -47,7 +47,6 @@ mqc = clients.SingleConsumer(MQ)
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = Queue(maxsize=999)
 
-
 with open('VERSION', 'r') as f:
     VERSION = f.read()
 
@@ -278,7 +277,7 @@ class VersionHandler(tornado.web.RequestHandler):
 
 class StatusHandler(tornado.web.RequestHandler):
 
-    def get(self):
+    async def get(self):
 
         response = {"upload-service: ": "up",
                     "message queue: ": "down",
@@ -292,6 +291,11 @@ class StatusHandler(tornado.web.RequestHandler):
             response['Quarantine Storage: '] = "up"
         if storage.up_check(storage.REJECT):
             response['Rejected Storage: '] = "up"
+        try:
+            await mqc.connect()
+            response['message queue: '] = "up"
+        except exc.NoBrokersError:
+            response['message queue: '] = "down"
 
         self.write(response)
 
