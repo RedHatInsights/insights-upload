@@ -280,22 +280,22 @@ class StatusHandler(tornado.web.RequestHandler):
     async def get(self):
 
         response = {"upload-service": "up",
-                    "message queue": "down",
-                    "Long Term Storage": "down",
-                    "Quarantine Storage": "down",
-                    "Rejected Storage": "down"}
+                    "message-queue": "down",
+                    "long-term-storage": "down",
+                    "quarantine-storage": "down",
+                    "rejected-storage": "down"}
 
         if storage.up_check(storage.PERM):
-            response['Long Term Storage'] = "up"
+            response['long-term-storage'] = "up"
         if storage.up_check(storage.QUARANTINE):
-            response['Quarantine Storage'] = "up"
+            response['quarantine-storage'] = "up"
         if storage.up_check(storage.REJECT):
-            response['Rejected Storage'] = "up"
+            response['rejected-storage'] = "up"
         try:
             await mqc.connect()
-            response['message queue'] = "up"
+            response['message-queue'] = "up"
         except exc.NoBrokersError:
-            response['message queue'] = "down"
+            response['message-queue'] = "down"
 
         self.write(response)
 
