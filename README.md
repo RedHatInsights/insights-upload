@@ -50,7 +50,7 @@ this should be fine.
 
 By default, the app will use the insights S3 account. If you do not have access
 to this, you will need to provide your own AWS creds and buckets via environment
-variables:
+variables OR choose to use localdisk rather than S3 by changing the code in app.py:
 
     AWS_ACCESS_KEY_ID
     AWS_SECRET_ACCESS_KEY
@@ -59,6 +59,10 @@ variables:
     S3_QUARANTINE
     S3_PERM
     S3_REJECT
+    
+Or change the import to localdisk:
+
+    from utils import localdisk as storage
 
 ### Installing
 
@@ -70,6 +74,10 @@ Once your environment variables are set on your localhost, bring up the stack:
     WINDOWS
     cd .\docker
     .\startup.ps1
+    
+This will stand up the full stack as well as initialize the topics in the message 
+queue that are necessary for testing. The Kiel library does not automatically create 
+topics in the MQ when they do not exist, so created them is critical.
 
 Upload a file to test to see if the system is working properly. Any file will
 work in testing as long as the `type` field is set properly. Use the `README.md`
