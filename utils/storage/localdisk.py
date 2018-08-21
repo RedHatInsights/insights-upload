@@ -3,11 +3,11 @@ import os
 QUARANTINE = os.getenv('S3_QUARANTINE', 'insights-upload-quarantine')
 PERM = os.getenv('S3_PERM', 'insights-upload-perm-test')
 REJECT = os.getenv('S3_REJECT', 'insights-upload-rejected')
-WORKDIR = '/tmp/uploads/'
+WORKDIR = os.getenv('WORKDIR', '/tmp/uploads/')
 dirs = [WORKDIR,
-        WORKDIR + 'insights-upload-quarantine',
-        WORKDIR + 'insights-upload-perm-test',
-        WORKDIR + 'insights-upload-rejected']
+        WORKDIR + QUARANTINE,
+        WORKDIR + PERM,
+        WORKDIR + REJECT]
 
 
 def stage():
