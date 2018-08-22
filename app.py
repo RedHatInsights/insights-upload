@@ -239,11 +239,16 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(invalid[0], invalid[1])
         else:
             service = split_content(self.request.files['upload'][0]['content_type'])
+            if self.requests.headers['x-rh-identity']:
+                identity = self.requests.headers['x-rh-identity']['identity']
             self.hash_value = uuid.uuid4().hex
             response, filename = await self.write_data()
             values['validation'] = 1
             values['hash'] = self.hash_value
             values['size'] = int(self.request.headers['Content-Length'])
+            if identity:
+                values['rh_account'] = identity['account_number']
+                values['principal'] = identity['id']
             values['service'] = service
             self.set_status(response['status'][0], response['status'][1])
             self.add_header('uuid', self.hash_value)
