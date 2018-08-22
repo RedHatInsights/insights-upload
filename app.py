@@ -90,7 +90,7 @@ async def consumer():
             msgs = await mqc.consume('uploadvalidation')
             if msgs:
                 logger.info('recieved message')
-                handle_file(msgs)
+                await handle_file(msgs)
         except exc.NoBrokersError:
             logger.error('Consume Failed: No Brokers Available')
             connected = False
