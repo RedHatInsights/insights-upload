@@ -1,3 +1,4 @@
+import asyncio
 import tornado.ioloop
 import tornado.web
 import os
@@ -33,6 +34,9 @@ LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
 
 # Maximum workers for threaded execution
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 10))
+
+# Maximum time to wait for an archive to upload to storage
+STORAGE_UPLOAD_TIMEOUT = int(os.getenv('STORAGE_UPLOAD_TIMEOUT', 60))
 
 # these are dummy values since we can't yet get a principal or rh_account
 values = {'principal': 'default_principal',
@@ -224,8 +228,40 @@ class UploadHandler(tornado.web.RequestHandler):
 
         Returns:
             str -- done. used to notify upload service to send to MQ
+            None if upload failed
         """
-        url = storage.write(filename, storage.QUARANTINE, self.hash_value)
+        logger.info("tracking id [%s] hash [%s] attempting upload", self.tracking_id, self.hash_value)
+
+        success = False
+        upload_start = time()
+        try:
+            url, callback = storage.write(filename, storage.QUARANTINE, self.hash_value)
+        except Exception:
+            logger.exception(
+                "Exception hit uploading: tracking id [%s] hash [%s]",
+                self.tracking_id, self.hash_value
+            )
+        else:
+            for count in range(0, STORAGE_UPLOAD_TIMEOUT * 10):
+                if callback.percentage >= 100:
+                    success = True
+                    break
+                await asyncio.sleep(.01)  # to avoid baking CPU while looping
+
+        if not success:
+            # Upload failed, return None
+            logger.error(
+                "upload id: %s upload failed or timed out after %dsec!",
+                self.hash_value, STORAGE_UPLOAD_TIMEOUT
+            )
+            return None
+
+        elapsed = callback.time_last_updated - upload_start
+        logger.info(
+            "tracking id [%s] hash [%s] uploaded! elapsed [%fsec] url [%s]",
+            self.tracking_id, self.hash_value, elapsed, url
+        )
+
         os.remove(filename)
         return url
 
@@ -260,14 +296,13 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(response['status'][0], response['status'][1])
             self.add_header('uuid', self.hash_value)
             self.finish()
+            self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
+
             url = await self.upload(filename)
-            tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
-            values['url'] = url
-            logger.info("tracking id [%s] hash [%s] url [%s]", tracking_id, self.hash_value, url)
-            mnm.send_to_influxdb(values)
-            while not storage.ls(storage.QUARANTINE, self.hash_value):
-                pass
-            else:
+            if url:
+                values['url'] = url
+                # TODO: send a metric to influx for a failed upload too?
+                mnm.send_to_influxdb(values)
                 await produce_queue.put({'topic': service, 'msg': values})
 
     def options(self):
