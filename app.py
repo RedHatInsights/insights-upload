@@ -249,7 +249,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['size'] = int(self.request.headers['Content-Length'])
             if identity:
                 values['rh_account'] = identity['account_number']
-                values['principal'] = identity['id']
+                values['principal'] = identity['org_id']
             values['service'] = service
             self.set_status(response['status'][0], response['status'][1])
             self.add_header('uuid', self.hash_value)
