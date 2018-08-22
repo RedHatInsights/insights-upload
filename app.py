@@ -261,13 +261,13 @@ class UploadHandler(tornado.web.RequestHandler):
             self.add_header('uuid', self.hash_value)
             self.finish()
             url = await self.upload(filename)
-            logger.info(url)
+            tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             values['url'] = url
+            logger.info("tracking id [%s] hash [%s] url [%s]", tracking_id, self.hash_value, url)
             mnm.send_to_influxdb(values)
             while not storage.ls(storage.QUARANTINE, self.hash_value):
                 pass
             else:
-                logger.info('upload id: ' + self.hash_value)
                 await produce_queue.put({'topic': service, 'msg': values})
 
     def options(self):
