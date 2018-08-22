@@ -230,6 +230,7 @@ class UploadHandler(tornado.web.RequestHandler):
         Validate upload, get service name, create UUID, write to storage, and send
         message to MQ
         """
+        identity = False
         if not self.request.files.get('upload'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
@@ -239,7 +240,7 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(invalid[0], invalid[1])
         else:
             service = split_content(self.request.files['upload'][0]['content_type'])
-            if self.request.headers['x-rh-identity']:
+            if self.request.headers.get('x-rh-identity'):
                 identity = self.request.headers['x-rh-identity']['identity']
             self.hash_value = uuid.uuid4().hex
             response, filename = await self.write_data()
