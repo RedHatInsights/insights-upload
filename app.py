@@ -3,7 +3,6 @@ import tornado.web
 import os
 import re
 import uuid
-import json
 import logging
 
 from tempfile import NamedTemporaryFile
