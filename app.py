@@ -248,6 +248,8 @@ class UploadHandler(tornado.web.RequestHandler):
                     break
                 await asyncio.sleep(.01)  # to avoid baking CPU while looping
 
+        os.remove(filename)
+
         if not success:
             # Upload failed, return None
             logger.error(
@@ -262,7 +264,6 @@ class UploadHandler(tornado.web.RequestHandler):
             self.tracking_id, self.hash_value, elapsed, url
         )
 
-        os.remove(filename)
         return url
 
     async def post(self):
