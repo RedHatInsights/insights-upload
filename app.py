@@ -11,13 +11,17 @@ from tornado.ioloop import IOLoop
 from tornado.queues import Queue, QueueFull
 from kiel import clients, exc
 from time import time, sleep
+from importlib import import_module
 
-from utils.storage import s3 as storage
 from utils import mnm
 
 # Logging
 logging.basicConfig(level=os.getenv("LOGLEVEL", "INFO"))
 logger = logging.getLogger('upload-service')
+
+# Set Storage driver to use
+storage_driver = os.getenv("STORAGE_DRIVER", "s3")
+storage = import_module("utils.storage.{}".format(storage_driver))
 
 # Upload content type must match this regex. Third field matches end service
 content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
