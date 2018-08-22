@@ -1,6 +1,7 @@
-import os
-import requests
 import logging
+import os
+
+import requests
 
 INFLUXDB_PLATFORM = os.getenv('INFLUX_URL', 'http://influxdb.mnm.svc.cluster.local:8086/write?db=platform')
 INFLUX_USER = os.getenv('INFLUX_USER')
