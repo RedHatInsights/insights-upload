@@ -30,6 +30,6 @@ def ls(src, uuid):
 
 
 def copy(src, dest, uuid):
-    os.rename(os.path.join(WORKDIR, src, uuid,
-              WORKDIR, dest, uuid))
+    os.rename(os.path.join(WORKDIR, src, uuid),
+              os.path.join(WORKDIR, dest, uuid))
     return os.path.join(WORKDIR, dest, uuid)
