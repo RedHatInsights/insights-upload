@@ -5,6 +5,7 @@ import re
 import uuid
 import json
 import logging
+import base64
 
 from tempfile import NamedTemporaryFile
 from tornado.ioloop import IOLoop
@@ -245,7 +246,8 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             service = split_content(self.request.files['upload'][0]['content_type'])
             if self.request.headers.get('x-rh-identity'):
-                identity = self.request.headers['x-rh-identity']['identity']
+                header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
+                identity = header['identity']
             self.hash_value = uuid.uuid4().hex
             response, filename = await self.write_data()
             values['validation'] = 1
