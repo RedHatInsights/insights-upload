@@ -135,6 +135,9 @@ async def producer():
                 continue
 
         # Pull items off our queue to produce
+        if len(produce_queue) == 0:
+            await asyncio.sleep(0.01)
+            continue
         for _ in range(0, len(produce_queue)):
             item = produce_queue.popleft()
             topic = item['topic']
@@ -151,7 +154,6 @@ async def producer():
                 connected = False
                 # Put the item back on the queue so we can push it when we reconnect
                 produce_queue.appendleft(item)
-        await asyncio.sleep(0.01)
 
 
 async def handle_file(msgs):
