@@ -1,14 +1,53 @@
-import app
-from os import getenv, path
+import os
+import shutil
+import boto3
+import pytest
+import sh
+from moto import mock_s3
 
-UPLOAD_API_URL = getenv(
-    'DEMO_UPLOAD',
-    'http://upload-service-demo2.1b13.insights.openshiftapps.com'
-)
-UPLOAD_API_VERSION = "0.0.1"
-UPLOAD_APP_TYPE = "application/vnd.redhat.advisor.test+tgz"
-UPLOAD_ARCHIVE = "%s/resources/insights_sample.tar.gz" % path.join(path.dirname(__file__))
+from utils.storage import localdisk as local_storage, s3 as s3_storage
 
-MIN_FILE_SIZE = 100
-ALLOWED_MAX_LENGTH = app.MAX_LENGTH
-FILE_SIZE_OVER_FLOW = 1024
+
+@pytest.fixture()
+def s3_mocked():
+    mock_s3().start()
+    client = boto3.client("s3")
+
+    client.create_bucket(Bucket=s3_storage.QUARANTINE)
+    client.create_bucket(Bucket=s3_storage.PERM)
+
+    s3_storage.s3 = client
+
+    yield client
+
+    mock_s3().stop()
+
+
+@pytest.fixture
+def local_file():
+    """
+    Allocate file in /var/tmp
+    """
+    file_path = "/var/tmp/insights.tar.gz"
+    sh.fallocate("-l", "100", file_path)
+
+    yield file_path
+
+    sh.rm("-f", file_path)
+
+
+@pytest.fixture(scope='function')
+def with_local_folders():
+    for _dir in local_storage.dirs:
+        os.makedirs(_dir, exist_ok=True)
+
+    yield None
+
+    for _dir in local_storage.dirs:
+        shutil.rmtree(_dir, ignore_errors=True)
+
+
+@pytest.fixture(scope='function')
+def no_local_folders():
+    for _dir in local_storage.dirs:
+        shutil.rmtree(_dir, ignore_errors=True)

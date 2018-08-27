@@ -5,3 +5,4 @@ requests
 pytest
 flake8
 moto
+sh
