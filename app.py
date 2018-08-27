@@ -299,7 +299,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['principal'] = identity['org_id']
         else:
             values['rh_account'] = DUMMY_VALUES['rh_account']
-            values['principcal'] = DUMMY_VALUES['principal']
+            values['principal'] = DUMMY_VALUES['principal']
         values['validation'] = 1
         values['hash'] = hash_value
         values['size'] = size
