@@ -7,12 +7,14 @@ name = "pypi"
 pylint = "*"
 pytest = "*"
 "flake8" = "*"
+"pep8" = "*"
 
 [packages]
 tornado = "*"
 "boto3" = "*"
 kiel = "*"
 requests = "*"
+botocore = "*"
 
 [requires]
 python_version = "3.6"

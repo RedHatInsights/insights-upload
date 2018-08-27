@@ -4,3 +4,4 @@ kiel
 requests
 pytest
 flake8
+botocore
