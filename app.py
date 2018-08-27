@@ -294,6 +294,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         values = {}
         # use dummy values for now if no account given
+        logger.info('identity - %s', identity)
         if identity:
             values['rh_account'] = identity['account_number']
             values['principal'] = identity['org_id']
