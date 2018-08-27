@@ -357,6 +357,7 @@ class UploadHandler(tornado.web.RequestHandler):
             tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             service = split_content(self.request.files['upload'][0]['content_type'])
             if self.request.headers.get('x-rh-identity'):
+                logger.info('x-rh-identity: %s', base64.b64decode(self.request.headers['x-rh-identity']))
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 identity = header['identity']
             size = int(self.request.headers['Content-Length'])
