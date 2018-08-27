@@ -1,2 +1,2 @@
 [run]
-omit = tests/util/*, tests/fixtures/*
+omit = tests/fixtures/*

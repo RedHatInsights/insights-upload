@@ -6,3 +6,4 @@ pytest
 flake8
 botocore
 moto
+sh
