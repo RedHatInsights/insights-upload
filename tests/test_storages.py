@@ -1,5 +1,4 @@
 import hashlib
-import uuid
 
 from botocore.exceptions import ClientError
 
@@ -17,7 +16,6 @@ class TestS3:
 
     def test_write(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
-
         write_response = s3_storage.write(
             local_file,
             s3_storage.QUARANTINE,
