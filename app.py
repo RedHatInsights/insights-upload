@@ -348,11 +348,11 @@ class UploadHandler(tornado.web.RequestHandler):
         if not self.request.files.get('upload'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
-            await self.finish()
+            return
         invalid = self.upload_validation()
         if invalid:
             self.set_status(invalid[0], invalid[1])
-            await self.finish()
+            return
         else:
             tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             service = split_content(self.request.files['upload'][0]['content_type'])
@@ -374,7 +374,7 @@ class UploadHandler(tornado.web.RequestHandler):
             asyncio.ensure_future(
                 self.process_upload(filename, size, tracking_id, hash_value, identity, service)
             )
-            await self.finish()
+            return
 
     def options(self):
         """Handle OPTIONS request to upload endpoint
