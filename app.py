@@ -147,7 +147,7 @@ async def producer():
                 len(produce_queue), topic, msg
             )
             try:
-                await mqp.produce(topic, json.dumps(msg))
+                await mqp.produce(topic, msg)
                 logger.info("Produced on topic %s: %s", topic, msg)
             except exc.NoBrokersError:
                 logger.error('Produce Failed: No Brokers Available')

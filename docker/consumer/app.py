@@ -49,7 +49,7 @@ while True:
 
     logger.info('Received message: {}'.format(msg.value().decode('utf-8')))
 
-    result = json.loads(json.loads(msg.value().decode('utf-8')))
+    result = json.loads(msg.value().decode('utf-8'))
 
     validation = {
         'hash': result['hash'],
