@@ -1,8 +1,11 @@
 import hashlib
 import uuid
 
+from botocore.exceptions import ClientError
+
 from tests.fixtures import *
 from utils.storage import localdisk as local_storage, s3 as s3_storage
+from utils.storage.s3 import UploadProgress
 
 
 class TestS3:
@@ -15,43 +18,48 @@ class TestS3:
     def test_write(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 
-        s3_response = s3_storage.write(
-            local_file,
-            s3_storage.QUARANTINE,
-            key_name
-        )
-
-        assert s3_response is not None
-        assert s3_storage.QUARANTINE in s3_response
-
-    def test_copy(self, local_file, s3_mocked):
-        key_name = uuid.uuid4().hex
-
         write_response = s3_storage.write(
             local_file,
             s3_storage.QUARANTINE,
             key_name
         )
-        copy_response = s3_storage.copy(s3_storage.QUARANTINE, s3_storage.PERM, key_name)
+
+        assert write_response is not None
+        assert isinstance(write_response, tuple)
+        assert len(write_response) == 2
+
+        url_path, s3_file_object = write_response
+
+        assert isinstance(url_path, str)
+        assert isinstance(s3_file_object, UploadProgress)
+        assert s3_storage.QUARANTINE in url_path
+
+    def test_copy(self, local_file, s3_mocked):
+        key_name = uuid.uuid4().hex
+
+        write_file_path, s3_file_object = s3_storage.write(
+            local_file,
+            s3_storage.QUARANTINE,
+            key_name
+        )
+        copy_file_path = s3_storage.copy(s3_storage.QUARANTINE, s3_storage.PERM, key_name)
 
         def _get_key(r):
             k = r.split('/')[3]
             return k[:k.find('?')]
 
-        assert write_response is not None
-        assert s3_storage.QUARANTINE in write_response
+        assert isinstance(write_file_path, str)
+        assert s3_storage.QUARANTINE in write_file_path
+        assert copy_file_path is not None
+        assert s3_storage.PERM in copy_file_path
+        assert copy_file_path != write_file_path
 
-        assert copy_response is not None
-        assert s3_storage.PERM in copy_response
-
-        assert copy_response != write_response
-
-        write_key, copy_key = _get_key(write_response), _get_key(copy_response)
+        write_key, copy_key = _get_key(write_file_path), _get_key(copy_file_path)
         assert write_key == copy_key
 
     def test_ls(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
-        write_response = s3_storage.write(
+        file_url, _ = s3_storage.write(
             local_file,
             s3_storage.QUARANTINE,
             key_name
@@ -59,8 +67,8 @@ class TestS3:
 
         ls_response = s3_storage.ls(s3_storage.QUARANTINE, key_name)
 
-        assert write_response is not None
-        assert ls_response is not None
+        assert file_url is not None
+        assert isinstance(ls_response, dict)
 
         assert ls_response['ContentLength'] == os.stat(local_file).st_size
         assert ls_response['ResponseMetadata']['HTTPStatusCode'] == 200
@@ -69,13 +77,21 @@ class TestS3:
         assert s3_storage.up_check(s3_storage.QUARANTINE) is True
         assert s3_storage.up_check('SomeBucket') is False
 
+    def test_ls_not_found(self, local_file, s3_mocked):
+        key_name = uuid.uuid4().hex
+
+        with pytest.raises(ClientError) as e:
+            s3_storage.ls(s3_storage.QUARANTINE, key_name)
+
+        assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
+
 
 class TestLocalDisk:
 
     def setup_method(self):
         self.temp_file_name = uuid.uuid4().hex
-        self.quarantine_folder = 'insights-upload-quarantine'
-        self.perm_folder = 'insights-upload-perm-test'
+        self.quarantine_folder = 'qa-insights-upload-quarantine'
+        self.perm_folder = 'qa-insights-upload-perm-test'
         self.non_existing_folder = 'some-random-folder'
 
     def test_write(self, with_local_folders):
