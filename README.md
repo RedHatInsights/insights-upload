@@ -98,13 +98,20 @@ To see the docker-compose logs:
 
 ## Running with Tests
 
-Any new features added to the application should be accompanied by a Unittest in `./tests`
+Any new features added to the application should be accompanied by a Unittest/Pytest in `./tests`
 
 To test the app, activate the virtualenv and then run pytest and flake8.
 
     source bin/activate
     pytest
     flake8
+
+There is several ways to generate the coverage report, but the commonly ways are:
+    
+    1. pytest --cov=.
+    2. pytest --cov=. --cov-report html
+    
+**NOTE**: you will find the HTML report at `./htmlcov`
 
 For information on Tornado testing, see [the documentation](http://www.tornadoweb.org/en/stable/_modules/tornado/testing.html)
 
