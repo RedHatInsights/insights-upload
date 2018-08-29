@@ -3,7 +3,6 @@ import collections
 import os
 import shutil
 import uuid
-from importlib import reload
 
 import boto3
 import pytest
@@ -108,16 +107,6 @@ def influx_db_credentials():
 
     mnm.INFLUX_USER = os.getenv('INFLUX_USER')
     mnm.INFLUX_PASS = os.getenv('INFLUX_PASS')
-
-
-@pytest.fixture
-def influx_db_namespace():
-    os.system("sudo mkdir -m 0777 -p {}".format(os.path.dirname(app.mnm.NAMESPACE_PATH)))
-    os.system("sudo chmod 0777 {}".format(os.path.dirname(app.mnm.NAMESPACE_PATH)))
-    os.system("sudo echo 'somenamespace' > {}".format(app.mnm.NAMESPACE_PATH))
-    reload(mnm)
-    yield
-    os.system("sudo rm -Rf {}".format(os.path.dirname(app.mnm.NAMESPACE_PATH)))
 
 
 class MyDeque(collections.deque):
