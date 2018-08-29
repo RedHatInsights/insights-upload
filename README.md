@@ -64,6 +64,10 @@ Or change the import to localdisk:
 
     from utils import localdisk as storage
 
+Also, you need to add the following environment variable, in order to run the tests
+
+    ASYNC_TEST_TIMEOUT=10
+
 ### Installing
 
 Once your environment variables are set on your localhost, bring up the stack:

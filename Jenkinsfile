@@ -4,6 +4,9 @@ pipeline {
       label 'python3'
     }
   }
+  environment {
+    ASYNC_TEST_TIMEOUT=10
+  }
   stages {
     stage('Testing') {
       steps {
