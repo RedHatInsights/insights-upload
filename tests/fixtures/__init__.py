@@ -32,7 +32,12 @@ def local_file():
     """
     Allocate file in /var/tmp
     """
-    file_path = "/var/tmp/insights.tar.gz"
+    file_path = "/tmp/insights.tar.gz"
+    try:
+        sh.rm(file_path)
+    except Exception as e:
+        pass
+
     sh.fallocate("-l", "100", file_path)
 
     yield file_path
@@ -40,7 +45,7 @@ def local_file():
     sh.rm(file_path)
 
 
-@pytest.fixture(scope='function')
+@pytest.fixture
 def with_local_folders():
     for _dir in local_storage.dirs:
         os.makedirs(_dir, exist_ok=True)
