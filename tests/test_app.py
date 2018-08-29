@@ -1,29 +1,25 @@
+import asyncio
 import io
 import json
 import os
+import uuid
 
 import boto3
-import mock
 import moto
+import pytest
 import requests
-from tornado.gen import coroutine
+from botocore.exceptions import ClientError
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 
 import app
-from utils.storage import s3 as storage
+from tests.libs.fake_mq import FakeMQ
+from utils.storage import s3 as s3_storage
+from tests.fixtures import broker_stage_messages, local_file, s3_mocked, event_loop
 
 client = AsyncHTTPClient()
 with open('VERSION', 'rb') as f:
     VERSION = f.read()
-
-
-def mqc_connect_mock():
-    conn_result = mock.Mock(name="CoroutineResult")
-    conn_func = mock.Mock(name="CoroutineFunction", side_effect=coroutine(conn_result))
-    conn_func.connect = conn_func
-    conn_func.connect.return_value = True
-    return conn_func
 
 
 class TestStatusHandler(AsyncHTTPTestCase):
@@ -32,35 +28,33 @@ class TestStatusHandler(AsyncHTTPTestCase):
         return app.app
 
     @gen_test
-    @mock.patch('app.mqc', new_callable=mqc_connect_mock)
-    def test_check_everything_up(self, mqc_mock):
-        app.mqc = mqc_mock
+    def test_check_everything_up(self):
+        with FakeMQ():
+            with moto.mock_s3():
+                s3_storage.s3 = boto3.client('s3')
+                s3_storage.s3.create_bucket(Bucket=s3_storage.QUARANTINE)
+                s3_storage.s3.create_bucket(Bucket=s3_storage.PERM)
+                s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
 
-        with moto.mock_s3():
-            storage.s3 = boto3.client('s3')
-            storage.s3.create_bucket(Bucket=storage.QUARANTINE)
-            storage.s3.create_bucket(Bucket=storage.PERM)
-            storage.s3.create_bucket(Bucket=storage.REJECT)
+                response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
 
-            response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
+                body = json.loads(response.body)
 
-            body = json.loads(response.body)
-
-            self.assertDictEqual(
-                body,
-                {
-                    "upload_service": "up",
-                    "message_queue": "up",
-                    "long_term_storage": "up",
-                    "quarantine_storage": "up",
-                    "rejected_storage": "up"
-                }
-            )
+                self.assertDictEqual(
+                    body,
+                    {
+                        "upload_service": "up",
+                        "message_queue": "up",
+                        "long_term_storage": "up",
+                        "quarantine_storage": "up",
+                        "rejected_storage": "up"
+                    }
+                )
 
     @gen_test
     def test_check_everything_down(self):
         with moto.mock_s3():
-            storage.s3 = boto3.client('s3')
+            s3_storage.s3 = boto3.client('s3')
             response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
 
             body = json.loads(response.body)
@@ -179,3 +173,152 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         self.assertEqual(response.exception.code, 415)
         self.assertEqual(response.exception.message, 'Upload field not found')
+
+
+class TestProducerAndConsumer:
+
+    @staticmethod
+    def _create_message_s3(_file, _stage_message, avoid_produce_queue=False, validation='success',
+                           topic='uploadvalidation'):
+        return _stage_message(_file, topic, avoid_produce_queue, validation)
+
+    @asyncio.coroutine
+    async def coroutine_test(self, method, exc_message='Stopping the iteration'):
+        with pytest.raises(Exception) as e:
+            await method()
+
+        assert str(e.value) == exc_message
+
+    def test_producer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+
+        total_messages = 4
+        [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
+
+        with FakeMQ():
+            assert app.mqp.produce_calls_count == 0
+            assert len(app.produce_queue) == total_messages
+
+            event_loop.run_until_complete(self.coroutine_test(app.producer))
+
+            assert app.mqp.produce_calls_count == total_messages
+            assert len(app.produce_queue) == 0
+            assert app.mqp.disconnect_in_operation_called is False
+            assert app.mqp.trying_to_connect_failures_calls == 0
+
+    def test_consumer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+
+        total_messages = 4
+        topic = 'uploadvalidation'
+        produced_messages = []
+        with FakeMQ():
+            for _ in range(total_messages):
+                message = self._create_message_s3(
+                    local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
+                )
+                app.mqc.produce(topic, message, True)
+                produced_messages.append(message)
+
+            for m in produced_messages:
+                assert s3_storage.ls(s3_storage.QUARANTINE, m['hash'])['ResponseMetadata']['HTTPStatusCode'] == 200
+
+            assert app.mqc.produce_calls_count == total_messages
+            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert len(app.produce_queue) == 0
+            assert app.mqc.consume_calls_count == 0
+
+            event_loop.run_until_complete(self.coroutine_test(app.consumer))
+
+            for m in produced_messages:
+                with pytest.raises(ClientError) as e:
+                    s3_storage.ls(s3_storage.QUARANTINE, m['hash'])
+                assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
+
+                assert s3_storage.ls(s3_storage.PERM, m['hash'])['ResponseMetadata']['HTTPStatusCode'] == 200
+
+            assert app.mqc.consume_calls_count > 0
+            assert app.mqc.consume_return_messages_count == 1
+
+            assert app.mqc.count_topic_messages(topic) == 0
+            assert app.mqc.disconnect_in_operation_called is False
+            assert app.mqc.trying_to_connect_failures_calls == 0
+            assert len(app.produce_queue) == 4
+
+    def test_consumer_with_validation_failure(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+
+        total_messages = 4
+        topic = 'uploadvalidation'
+        s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
+        produced_messages = []
+
+        with FakeMQ():
+            for _ in range(total_messages):
+                message = self._create_message_s3(
+                    local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='failure'
+                )
+                app.mqc.produce(topic, message, True)
+                produced_messages.append(message)
+
+            assert app.mqc.produce_calls_count == total_messages
+            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert len(app.produce_queue) == 0
+            assert app.mqc.consume_calls_count == 0
+
+            event_loop.run_until_complete(self.coroutine_test(app.consumer))
+
+            for m in produced_messages:
+                with pytest.raises(ClientError) as e:
+                    s3_storage.ls(s3_storage.QUARANTINE, m['hash'])
+                assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
+
+                assert s3_storage.ls(s3_storage.REJECT, m['hash'])['ResponseMetadata']['HTTPStatusCode'] == 200
+
+            assert app.mqc.consume_calls_count > 0
+            assert app.mqc.consume_return_messages_count == 1
+
+            assert app.mqc.count_topic_messages(topic) == 0
+            assert app.mqc.disconnect_in_operation_called is False
+            assert app.mqc.trying_to_connect_failures_calls == 0
+            assert len(app.produce_queue) == 0
+
+    def test_producer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+
+        total_messages = 4
+        [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
+
+        with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2):
+            assert app.mqp.produce_calls_count == 0
+            assert len(app.produce_queue) == total_messages
+
+            event_loop.run_until_complete(self.coroutine_test(app.producer))
+
+            assert app.mqp.produce_calls_count == total_messages
+            assert len(app.produce_queue) == 0
+            assert app.mqp.disconnect_in_operation_called is True
+            assert app.mqp.trying_to_connect_failures_calls == 1
+
+    def test_consumer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+
+        total_messages = 4
+        topic = 'uploadvalidation'
+
+        with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2):
+            for _ in range(total_messages):
+                message = self._create_message_s3(
+                    local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
+                )
+                app.mqc.produce(topic, message, True)
+
+            assert app.mqc.produce_calls_count == total_messages
+            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert len(app.produce_queue) == 0
+            assert app.mqc.consume_calls_count == 0
+
+            event_loop.run_until_complete(self.coroutine_test(app.consumer))
+
+            assert app.mqc.consume_calls_count > 0
+            assert app.mqc.consume_return_messages_count == 1
+
+            assert app.mqc.count_topic_messages(topic) == 0
+            assert app.mqc.disconnect_in_operation_called is True
+            assert app.mqc.trying_to_connect_failures_calls == 1
+            assert len(app.produce_queue) == 4
