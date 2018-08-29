@@ -2,7 +2,6 @@ import asyncio
 import io
 import json
 import os
-import uuid
 
 import boto3
 import moto
@@ -271,6 +270,36 @@ class TestProducerAndConsumer:
                 assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
 
                 assert s3_storage.ls(s3_storage.REJECT, m['hash'])['ResponseMetadata']['HTTPStatusCode'] == 200
+
+            assert app.mqc.consume_calls_count > 0
+            assert app.mqc.consume_return_messages_count == 1
+
+            assert app.mqc.count_topic_messages(topic) == 0
+            assert app.mqc.disconnect_in_operation_called is False
+            assert app.mqc.trying_to_connect_failures_calls == 0
+            assert len(app.produce_queue) == 0
+
+    def test_consumer_with_validation_unknown(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+
+        total_messages = 4
+        topic = 'uploadvalidation'
+        s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
+        produced_messages = []
+
+        with FakeMQ():
+            for _ in range(total_messages):
+                message = self._create_message_s3(
+                    local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='unknown'
+                )
+                app.mqc.produce(topic, message, True)
+                produced_messages.append(message)
+
+            assert app.mqc.produce_calls_count == total_messages
+            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert len(app.produce_queue) == 0
+            assert app.mqc.consume_calls_count == 0
+
+            event_loop.run_until_complete(self.coroutine_test(app.consumer))
 
             assert app.mqc.consume_calls_count > 0
             assert app.mqc.consume_return_messages_count == 1
