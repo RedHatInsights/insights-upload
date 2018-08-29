@@ -1,20 +1,15 @@
-import asyncio
 import io
 import json
-import os
 
-import boto3
 import moto
-import pytest
 import requests
 from botocore.exceptions import ClientError
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 
-import app
-from tests.libs.fake_mq import FakeMQ
+from tests.fixtures import *
+from tests.fixtures.fake_mq import FakeMQ
 from utils.storage import s3 as s3_storage
-from tests.fixtures import broker_stage_messages, local_file, s3_mocked, event_loop
 
 client = AsyncHTTPClient()
 with open('VERSION', 'rb') as f:
