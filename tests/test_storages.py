@@ -89,29 +89,33 @@ class TestS3:
 
 
 class TestLocalDisk:
+    
+    @staticmethod
+    def _get_file_data():
+        return os.urandom(100).decode('latin1').encode('utf-8').decode()
 
     def setup_method(self):
         self.temp_file_name = uuid.uuid4().hex
         self.non_existing_folder = 'some-random-folder'
 
     def test_write(self, with_local_folders):
-        file_name = local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
+        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
 
     def test_write_wrong_destination(self, with_local_folders):
         with pytest.raises(FileNotFoundError):
-            local_storage.write(os.urandom(100).decode('latin1'), self.non_existing_folder, self.temp_file_name)
+            local_storage.write(self._get_file_data(), self.non_existing_folder, self.temp_file_name)
 
     def test_write_no_folders_at_all(self, no_local_folders):
-        file_name = local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
+        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
 
     def test_ls(self, with_local_folders):
-        local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
+        local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
         assert local_storage.ls(local_storage.QUARANTINE, self.temp_file_name) is True
 
     def test_ls_file_not_found(self, with_local_folders):
@@ -125,7 +129,7 @@ class TestLocalDisk:
             assert os.path.isdir(_dir) is True
 
     def test_copy(self, with_local_folders):
-        original_file_path = local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
+        original_file_path = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         original_file = open(original_file_path, 'rb')
         original_checksum = hashlib.md5(original_file.read()).hexdigest()
