@@ -61,32 +61,32 @@ def no_local_folders():
         shutil.rmtree(_dir, ignore_errors=True)
 
 
-@responses.activate
 @pytest.fixture
 def influx_db_mock():
-    # responses.reset()
-    mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
-    responses.add(
-        responses.POST, mnm.INFLUXDB_PLATFORM,
-        json={"message": "saved"}, status=201
-    )
+    with responses.activate():
+        # responses.reset()
+        mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
+        responses.add(
+            responses.POST, mnm.INFLUXDB_PLATFORM,
+            json={"message": "saved"}, status=201
+        )
 
-    yield mnm.INFLUXDB_PLATFORM
-    mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
+        yield mnm.INFLUXDB_PLATFORM
+        mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
 
 
-@responses.activate
 @pytest.fixture
 def influx_db_error_mock():
-    # responses.reset()
-    mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
-    responses.add(
-        responses.POST, mnm.INFLUXDB_PLATFORM,
-        json={"message": 'error'}, status=422
-    )
+    with responses.activate():
+        # responses.reset()
+        mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
+        responses.add(
+            responses.POST, mnm.INFLUXDB_PLATFORM,
+            json={"message": 'error'}, status=422
+        )
 
-    yield mnm.INFLUXDB_PLATFORM
-    mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
+        yield mnm.INFLUXDB_PLATFORM
+        mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
 
 
 @pytest.fixture
