@@ -117,6 +117,12 @@ There is several ways to generate the coverage report, but the commonly ways are
     
 **NOTE**: you will find the HTML report at `./htmlcov`
 
+For last, but not less important, it is highly recommended to run all of your tests with `-rx` argument. There is a few tests that are using `pytest.xfail` which is a friendly way to flag that some test has failed, with this argument you'll be able to see the reason why those tests are failing.
+
+e.g:
+   
+    pytest -rx --cov=. 
+
 For information on Tornado testing, see [the documentation](http://www.tornadoweb.org/en/stable/_modules/tornado/testing.html)
 
 ## Deployment
