@@ -1,6 +1,5 @@
 tornado
 boto3==1.7.*
-kiel
 requests
 pytest
 pytest-cov
@@ -8,3 +7,4 @@ flake8
 moto
 sh
 pytest-responses
+aiokafka

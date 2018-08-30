@@ -12,9 +12,9 @@ pytest = "*"
 [packages]
 tornado = "*"
 "boto3" = "*"
-kiel = "*"
 requests = "*"
 botocore = "*"
+aiokafka = "*"
 
 [requires]
 python_version = "3.6"

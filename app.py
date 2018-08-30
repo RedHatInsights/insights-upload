@@ -16,7 +16,8 @@ import tornado.ioloop
 import tornado.web
 from tornado.ioloop import IOLoop
 
-from kiel import clients, exc
+from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from kafka.errors import KafkaError
 from utils import mnm
 
 # Logging
@@ -55,10 +56,7 @@ DUMMY_VALUES = {
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
-
-# message queues
-mqp = clients.Producer(MQ)
-mqc = clients.SingleConsumer(MQ)
+MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque([], 999)
@@ -87,29 +85,33 @@ def split_content(content):
 async def consumer():
     """Consume indefinitely from the 'uploadvalidation' queue.
     """
+    mqc = AIOKafkaConsumer(
+        'uploadvalidation', loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, group_id=MQ_GROUP_ID
+    )
     connected = False
     while True:
         # If not connected, attempt to connect...
         if not connected:
             try:
                 logger.info("Consume client not connected, attempting to connect...")
-                await mqc.connect()
+                await mqc.start()
                 logger.info("Consumer client connected!")
                 connected = True
-            except exc.NoBrokersError:
-                logger.error('Consume client connect failed: No Brokers Available')
+            except KafkaError:
+                logger.exception('Consume client hit error, triggering re-connect...')
                 await asyncio.sleep(5)
                 continue
 
         # Consume
         try:
-            msgs = await mqc.consume('uploadvalidation')
-            if msgs:
-                logger.info('recieved message')
-                await handle_file(msgs)
-        except exc.NoBrokersError:
-            logger.error('Consume Failed: No Brokers Available')
+            data = await mqc.getmany()
+            for tp, msgs in data.items():
+                if tp.topic == 'uploadvalidation':
+                    await handle_file(msgs)
+        except KafkaError:
+            logger.exception('Consume client hit error, triggering re-connect...')
             connected = False
+        await asyncio.sleep(0.1)
 
 
 async def producer():
@@ -120,24 +122,29 @@ async def producer():
         msg {dict} -- JSON containing a rh_account, principal, payload hash,
                         and url for download
     """
+    mqp = AIOKafkaProducer(
+        loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
+        connections_max_idle_ms=None
+    )
     connected = False
     while True:
         # If not connected to kafka, attempt to connect...
         if not connected:
             try:
                 logger.info("Producer client not connected, attempting to connect...")
-                await mqp.connect()
+                await mqp.start()
                 logger.info("Producer client connected!")
                 connected = True
-            except exc.NoBrokersError:
-                logger.error('Producer client connect failed: No Brokers Available')
+            except KafkaError:
+                logger.exception('Producer client hit error, triggering re-connect...')
                 await asyncio.sleep(5)
                 continue
 
         # Pull items off our queue to produce
-        if len(produce_queue) == 0:
-            await asyncio.sleep(0.01)
+        if not produce_queue:
+            await asyncio.sleep(0.1)
             continue
+
         for _ in range(0, len(produce_queue)):
             item = produce_queue.popleft()
             topic = item['topic']
@@ -147,10 +154,10 @@ async def producer():
                 len(produce_queue), topic, msg
             )
             try:
-                await mqp.produce(topic, msg)
+                await mqp.send_and_wait(topic, json.dumps(msg).encode('utf-8'))
                 logger.info("Produced on topic %s: %s", topic, msg)
-            except exc.NoBrokersError:
-                logger.error('Produce Failed: No Brokers Available')
+            except KafkaError:
+                logger.exception('Producer client hit error, triggering re-connect...')
                 connected = False
                 # Put the item back on the queue so we can push it when we reconnect
                 produce_queue.appendleft(item)
@@ -163,12 +170,19 @@ async def handle_file(msgs):
     storage.copy operations are not async so we offload to the executor
 
     Arguments:
-        msgs {dict} -- The message returned by the validating service
+        msgs -- list of kafka messages consumed on 'uploadvalidation' topic
     """
     for msg in msgs:
-        hash_ = msg['hash']
-        result = msg['validation']
-        logger.info('processing message: %s - %s' % (hash_, result))
+        try:
+            data = json.loads(msg.value)
+        except ValueError:
+            logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value))
+            continue
+
+        hash_ = data['hash']
+        result = data['validation']
+
+        logger.info('processing message: %s - %s', hash_, result)
         if result.lower() == 'success':
             url = await IOLoop.current().run_in_executor(
                 None, storage.copy, storage.QUARANTINE, storage.PERM, hash_
@@ -181,12 +195,12 @@ async def handle_file(msgs):
                 }
             )
         elif result.lower() == 'failure':
-            logger.info(hash_ + ' rejected')
+            logger.info('%s rejected', hash_)
             url = await IOLoop.current().run_in_executor(
                 None, storage.copy, storage.QUARANTINE, storage.REJECT, hash_
             )
         else:
-            logger.info('Unrecognized result: ' + result.lower())
+            logger.info('Unrecognized result: %s', result.lower())
 
 
 class RootHandler(tornado.web.RequestHandler):
