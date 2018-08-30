@@ -3,6 +3,7 @@ import collections
 import os
 import shutil
 import uuid
+from importlib import reload
 
 import boto3
 import pytest
@@ -61,32 +62,32 @@ def no_local_folders():
         shutil.rmtree(_dir, ignore_errors=True)
 
 
+@responses.activate
 @pytest.fixture
 def influx_db_mock():
-    with responses.activate():
-        # responses.reset()
-        mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
-        responses.add(
-            responses.POST, mnm.INFLUXDB_PLATFORM,
-            json={"message": "saved"}, status=201
-        )
+    # responses.reset()
+    mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
+    responses.add(
+        responses.POST, mnm.INFLUXDB_PLATFORM,
+        json={"message": "saved"}, status=201
+    )
 
-        yield mnm.INFLUXDB_PLATFORM
-        mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
+    yield mnm.INFLUXDB_PLATFORM
+    mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
 
 
+@responses.activate
 @pytest.fixture
 def influx_db_error_mock():
-    with responses.activate():
-        # responses.reset()
-        mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
-        responses.add(
-            responses.POST, mnm.INFLUXDB_PLATFORM,
-            json={"message": 'error'}, status=422
-        )
+    # responses.reset()
+    mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
+    responses.add(
+        responses.POST, mnm.INFLUXDB_PLATFORM,
+        json={"message": 'error'}, status=422
+    )
 
-        yield mnm.INFLUXDB_PLATFORM
-        mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
+    yield mnm.INFLUXDB_PLATFORM
+    mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
 
 
 @pytest.fixture
@@ -107,6 +108,16 @@ def influx_db_credentials():
 
     mnm.INFLUX_USER = os.getenv('INFLUX_USER')
     mnm.INFLUX_PASS = os.getenv('INFLUX_PASS')
+
+
+@pytest.fixture
+def influx_db_namespace():
+    os.system("sudo mkdir -m 0777 -p {}".format(os.path.dirname(app.mnm.NAMESPACE_PATH)))
+    os.system("sudo chmod 0777 {}".format(os.path.dirname(app.mnm.NAMESPACE_PATH)))
+    os.system("sudo echo 'somenamespace' > {}".format(app.mnm.NAMESPACE_PATH))
+    reload(mnm)
+    yield
+    os.system("sudo rm -Rf {}".format(os.path.dirname(app.mnm.NAMESPACE_PATH)))
 
 
 class MyDeque(collections.deque):
