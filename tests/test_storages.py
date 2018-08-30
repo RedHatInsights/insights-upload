@@ -1,7 +1,9 @@
 import hashlib
 
-from botocore.exceptions import ClientError
+from random import randint
 
+from botocore.exceptions import ClientError
+from string import ascii_letters, digits
 from .fixtures import *
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 from utils.storage.s3 import UploadProgress
@@ -20,6 +22,7 @@ class TestS3:
 
     def test_write(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
+
         write_response = s3_storage.write(
             local_file,
             s3_storage.QUARANTINE,
@@ -92,7 +95,7 @@ class TestLocalDisk:
     
     @staticmethod
     def _get_file_data():
-        return os.urandom(100).decode('latin1').encode('utf-8').decode()
+        return ''.join([(ascii_letters + digits)[randint(0, 61)] for _ in range(100)])
 
     def setup_method(self):
         self.temp_file_name = uuid.uuid4().hex
