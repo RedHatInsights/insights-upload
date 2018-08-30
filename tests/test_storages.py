@@ -2,7 +2,7 @@ import hashlib
 
 from botocore.exceptions import ClientError
 
-from tests.fixtures import *
+from .fixtures import *
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 from utils.storage.s3 import UploadProgress
 from utils import mnm
@@ -11,9 +11,12 @@ from utils import mnm
 class TestS3:
 
     def test_credentials_acl(self):
-        for bucket in (s3_storage.QUARANTINE, s3_storage.PERM, s3_storage.REJECT):
-            credentials = s3_storage.s3.get_bucket_acl(Bucket=bucket)
-            assert credentials['Grants'][0]['Permission'], 'FULL_CONTROL'
+        try:
+            for bucket in (s3_storage.QUARANTINE, s3_storage.PERM, s3_storage.REJECT):
+                credentials = s3_storage.s3.get_bucket_acl(Bucket=bucket)
+                assert credentials['Grants'][0]['Permission'], 'FULL_CONTROL'
+        except ClientError:
+            pytest.xfail("Something is wrong with the AWS Credentials, please check them and run this test again")
 
     def test_write(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
@@ -90,12 +93,10 @@ class TestLocalDisk:
 
     def setup_method(self):
         self.temp_file_name = uuid.uuid4().hex
-        self.quarantine_folder = 'qa-insights-upload-quarantine'
-        self.perm_folder = 'qa-insights-upload-perm-test'
         self.non_existing_folder = 'some-random-folder'
 
     def test_write(self, with_local_folders):
-        file_name = local_storage.write(os.urandom(100).decode('latin1'), self.quarantine_folder, self.temp_file_name)
+        file_name = local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
@@ -105,17 +106,17 @@ class TestLocalDisk:
             local_storage.write(os.urandom(100).decode('latin1'), self.non_existing_folder, self.temp_file_name)
 
     def test_write_no_folders_at_all(self, no_local_folders):
-        file_name = local_storage.write(os.urandom(100).decode('latin1'), self.quarantine_folder, self.temp_file_name)
+        file_name = local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
 
     def test_ls(self, with_local_folders):
-        local_storage.write(os.urandom(100).decode('latin1'), self.quarantine_folder, self.temp_file_name)
-        assert local_storage.ls(self.quarantine_folder, self.temp_file_name) is True
+        local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
+        assert local_storage.ls(local_storage.QUARANTINE, self.temp_file_name) is True
 
     def test_ls_file_not_found(self, with_local_folders):
-        assert local_storage.ls(self.quarantine_folder, self.temp_file_name) is None
+        assert local_storage.ls(local_storage.QUARANTINE, self.temp_file_name) is None
 
     def test_stage(self, no_local_folders):
         # just to make sure that there is no folder left in there
@@ -125,13 +126,13 @@ class TestLocalDisk:
             assert os.path.isdir(_dir) is True
 
     def test_copy(self, with_local_folders):
-        original_file_path = local_storage.write(os.urandom(100).decode('latin1'), self.quarantine_folder, self.temp_file_name)
+        original_file_path = local_storage.write(os.urandom(100).decode('latin1'), local_storage.QUARANTINE, self.temp_file_name)
 
         original_file = open(original_file_path, 'rb')
         original_checksum = hashlib.md5(original_file.read()).hexdigest()
         original_file.close()
 
-        copied_file_path = local_storage.copy(self.quarantine_folder, self.perm_folder, self.temp_file_name)
+        copied_file_path = local_storage.copy(local_storage.QUARANTINE, local_storage.PERM, self.temp_file_name)
 
         assert os.path.basename(original_file_path) == os.path.basename(copied_file_path)
         assert original_file_path != copied_file_path

@@ -47,22 +47,23 @@ class TestStatusHandler(AsyncHTTPTestCase):
 
     @gen_test
     def test_check_everything_down(self):
-        with moto.mock_s3():
-            s3_storage.s3 = boto3.client('s3')
-            response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
+        with FakeMQ(is_down=True):
+            with moto.mock_s3():
+                s3_storage.s3 = boto3.client('s3')
+                response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
 
-            body = json.loads(response.body)
+                body = json.loads(response.body)
 
-            self.assertDictEqual(
-                body,
-                {
-                    "upload_service": "up",
-                    "message_queue": "down",
-                    "long_term_storage": "down",
-                    "quarantine_storage": "down",
-                    "rejected_storage": "down"
-                }
-            )
+                self.assertDictEqual(
+                    body,
+                    {
+                        "upload_service": "up",
+                        "message_queue": "down",
+                        "long_term_storage": "down",
+                        "quarantine_storage": "down",
+                        "rejected_storage": "down"
+                    }
+                )
 
 
 class TestUploadHandler(AsyncHTTPTestCase):

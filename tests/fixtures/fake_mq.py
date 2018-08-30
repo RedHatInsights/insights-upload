@@ -33,6 +33,8 @@ class FakeMQ:
     trying_to_connect_failures_calls = 0
     consume_return_messages_count = 0
 
+    is_down = False
+
     def __enter__(self):
         app.mqc, app.mqp = self, self
         return self
@@ -67,7 +69,7 @@ class FakeMQ:
 
     @gen.coroutine
     def connect(self):
-        if self.connection_failing_attempt_countdown <= 0:
+        if self.connection_failing_attempt_countdown <= 0 and not self.is_down:
             return True
 
         self.connection_failing_attempt_countdown -= 1
