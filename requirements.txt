@@ -7,4 +7,4 @@ pytest-cov
 flake8
 moto
 sh
-responses
+pytest-responses
