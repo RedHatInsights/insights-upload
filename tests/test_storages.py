@@ -1,14 +1,19 @@
 import hashlib
-
+import os
+import uuid
 from random import randint
-
-from botocore.exceptions import ClientError
 from string import ascii_letters, digits
+
+import pytest
 import responses
-from .fixtures import *
+from botocore.exceptions import ClientError
+
+from utils import mnm
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 from utils.storage.s3 import UploadProgress
-from utils import mnm
+from tests.fixtures import (
+    s3_mocked, local_file, with_local_folders, no_local_folders, influx_db_mock, influx_db_error_mock, influx_db_values,
+    influx_db_credentials, influx_db_namespace)  # flake8: noqa
 
 
 class TestS3:
@@ -94,7 +99,7 @@ class TestS3:
 
 
 class TestLocalDisk:
-    
+
     @staticmethod
     def _get_file_data():
         return ''.join([(ascii_letters + digits)[randint(0, 61)] for _ in range(100)])
@@ -156,7 +161,7 @@ class TestLocalDisk:
 
 
 class TestInfluxDB:
-    
+
     def test_send_to_influxdb(self, influx_db_mock, influx_db_credentials, influx_db_values):
         method_response = mnm.send_to_influxdb(influx_db_values)
 
