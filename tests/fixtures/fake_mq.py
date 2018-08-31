@@ -1,12 +1,11 @@
-import json
-
 from kafka.errors import KafkaError
 
 import app
-from typing import Text, List, Dict, ByteString
+from typing import Text, Dict, ByteString
 from tornado import gen
 
 from tests.fixtures import MockMessage, MockTopicPartition, StopLoopException
+
 
 class FakeMQ:
     """

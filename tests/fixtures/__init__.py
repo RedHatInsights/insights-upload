@@ -29,7 +29,7 @@ class MockMessage:
 
 class MockTopicPartition:
     """Mocks aiokafka 'topic-partition' key.
-    
+
     AIOkafka's consumer getmany() method returns a dict with 'TopicPartition'
     as the key and a list of messages as the value
     """
