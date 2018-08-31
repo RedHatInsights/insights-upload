@@ -12,7 +12,7 @@ dirs = [WORKDIR,
 
 def stage():
     for dir_ in dirs:
-        os.makedirs(dir_)
+        os.makedirs(dir_, exist_ok=True)
 
 
 def write(data, dest, uuid):

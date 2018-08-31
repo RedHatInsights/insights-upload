@@ -64,6 +64,10 @@ Or change the import to localdisk:
 
     from utils import localdisk as storage
 
+Also, you need to add the following environment variable, in order to run the tests
+
+    ASYNC_TEST_TIMEOUT=10
+
 ### Installing
 
 Once your environment variables are set on your localhost, bring up the stack:
@@ -98,13 +102,26 @@ To see the docker-compose logs:
 
 ## Running with Tests
 
-Any new features added to the application should be accompanied by a Unittest in `./tests`
+Any new features added to the application should be accompanied by a Unittest/Pytest in `./tests`
 
 To test the app, activate the virtualenv and then run pytest and flake8.
 
     source bin/activate
     pytest
     flake8
+
+There is several ways to generate the coverage report, but the commonly ways are:
+    
+    1. pytest --cov=.
+    2. pytest --cov=. --cov-report html
+    
+**NOTE**: you will find the HTML report at `./htmlcov`
+
+For last, but not less important, it is highly recommended to run all of your tests with `-rx` argument. There is a few tests that are using `pytest.xfail` which is a friendly way to flag that some test has failed, with this argument you'll be able to see the reason why those tests are failing.
+
+e.g:
+   
+    pytest -rx --cov=. 
 
 For information on Tornado testing, see [the documentation](http://www.tornadoweb.org/en/stable/_modules/tornado/testing.html)
 

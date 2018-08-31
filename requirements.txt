@@ -1,7 +1,10 @@
 tornado
-boto3
+boto3==1.7.*
 kiel
 requests
 pytest
+pytest-cov
 flake8
-botocore
+moto
+sh
+pytest-responses

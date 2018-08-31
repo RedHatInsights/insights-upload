@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 # Get the namespace to tag for influxdb.
 if os.path.exists(NAMESPACE_PATH):
     with open(NAMESPACE_PATH, 'r') as f:
-        NAMESPACE = f.read
+        NAMESPACE = f.read().strip()
 
 
 def send_to_influxdb(values):
