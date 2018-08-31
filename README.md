@@ -104,10 +104,16 @@ To see the docker-compose logs:
 
 Any new features added to the application should be accompanied by a Unittest/Pytest in `./tests`
 
+To test, you'll need a python virtualenv with python3 and to install requirements:
+
+    virtualenv . -p ($which python3)
+    source bin/activate
+    pip3 install -r requirements
+
 To test the app, activate the virtualenv and then run pytest and flake8.
 
     source bin/activate
-    pytest
+    pytest ./tests
     flake8
 
 There is several ways to generate the coverage report, but the commonly ways are:
