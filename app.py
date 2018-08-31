@@ -57,6 +57,14 @@ DUMMY_VALUES = {
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
+mqc = AIOKafkaConsumer(
+    'uploadvalidation', loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
+    group_id=MQ_GROUP_ID
+)
+mqp = AIOKafkaProducer(
+    loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
+    connections_max_idle_ms=None
+)
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque([], 999)
@@ -91,9 +99,6 @@ class MQStatus(object):
 async def consumer():
     """Consume indefinitely from the 'uploadvalidation' queue.
     """
-    mqc = AIOKafkaConsumer(
-        'uploadvalidation', loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, group_id=MQ_GROUP_ID
-    )
     MQStatus.mqc_connected = False
     while True:
         # If not connected, attempt to connect...
@@ -128,10 +133,6 @@ async def producer():
         msg {dict} -- JSON containing a rh_account, principal, payload hash,
                         and url for download
     """
-    mqp = AIOKafkaProducer(
-        loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
-        connections_max_idle_ms=None
-    )
     MQStatus.mqp_connected = False
     while True:
         # If not connected to kafka, attempt to connect...

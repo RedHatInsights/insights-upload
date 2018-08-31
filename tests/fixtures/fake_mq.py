@@ -1,9 +1,12 @@
-from kiel.exc import NoBrokersError
+import json
+
+from kafka.errors import KafkaError
 
 import app
-from typing import Text, List
+from typing import Text, List, Dict, ByteString
 from tornado import gen
 
+from tests.fixtures import MockMessage, MockTopicPartition, StopLoopException
 
 class FakeMQ:
     """
@@ -36,72 +39,72 @@ class FakeMQ:
     is_down = False
 
     def __enter__(self):
+        self._orig_mqc, self._orig_mqp = app.mqc, app.mqp
         app.mqc, app.mqp = self, self
         return self
 
     def __exit__(self, *args):
-        app.mqp, app.mqc = app.clients.Producer(app.MQ), app.clients.SingleConsumer(app.MQ)
+        app.mqp, app.mqc = self._orig_mqp, self._orig_mqc
 
     def __init__(self, *args, **kwargs):
+        self._orig_mqc = None
+        self._orig_mqp = None
         for k, v in kwargs.items():
             if not hasattr(self, k):
                 raise Exception("Bad parameter {} - FakeMQ".format(k))
             setattr(self, k, v)
         self._topics = {}
 
-    def start(self):
-        self.__enter__()
-
-    def stop(self):
-        self.__exit__()
-
     def _raise_if_need_to(self, calls: int = 0, avoid_iteration_control=False):
         if not avoid_iteration_control:
             if self.disconnect_in_operation > 0 and self.disconnect_in_operation == (calls - 1):
                 self.disconnect_in_operation = 0
                 self.disconnect_in_operation_called = True
-                raise NoBrokersError("Failed to connect to the FakeMQ")
+                raise KafkaError("Failed to connect to the FakeMQ")
 
             if self.stop_iteration_countdown <= 0:
-                raise Exception('Stopping the iteration')
+                raise StopLoopException('Stopping the iteration')
 
             self.stop_iteration_countdown -= 1
 
     @gen.coroutine
-    def connect(self):
+    def start(self):
         if self.connection_failing_attempt_countdown <= 0 and not self.is_down:
             return True
 
         self.connection_failing_attempt_countdown -= 1
         self.trying_to_connect_failures_calls += 1
-        raise NoBrokersError("Failed to connect to the FakeMQ")
+        raise KafkaError("Failed to connect to the FakeMQ")
 
     @gen.coroutine
-    def produce(self, topic: Text, message: Text, avoid_iteration_control=False):
+    def send_and_wait(self, topic: Text, message: ByteString, avoid_iteration_control=False):
         self._raise_if_need_to(self.produce_calls_count, avoid_iteration_control)
 
         if not topic or not message:
             raise Exception("You must provide a topic and a message")
 
         self._topics.setdefault(topic, [])
-        self._topics[topic].append(message)
+        self._topics[topic].append(MockMessage(message))
         self.produce_calls_count += 1
         return True
 
     @gen.coroutine
-    def consume(self, topic: Text, avoid_iteration_control=False) -> List:
+    def getmany(self, avoid_iteration_control=False) -> Dict:
+        # At the moment, this is the only topic we consume from ...
+        topic = "uploadvalidation"
+
         self._raise_if_need_to(self.consume_calls_count, avoid_iteration_control)
         self.consume_calls_count += 1
 
         if not self._topics.get(topic):
-            return []
+            return {}
 
         msgs, self._topics[topic] = self._topics[topic], []
 
         if msgs:
             self.consume_return_messages_count += 1
 
-        return msgs
+        return {MockTopicPartition(topic): msgs}
 
     def count_topic_messages(self, topic):
         return len(self._topics.get(topic, []))

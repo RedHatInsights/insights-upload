@@ -12,7 +12,10 @@ from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 
 import app
-from tests.fixtures import local_file, s3_mocked, broker_stage_messages, event_loop  # flake8: noqa
+from tests.fixtures import (
+    StopLoopException, local_file, s3_mocked, broker_stage_messages, event_loop,
+    produce_queue_mocked
+) # flake8: noqa
 from tests.fixtures.fake_mq import FakeMQ
 from utils.storage import s3 as s3_storage
 
@@ -22,7 +25,6 @@ with open('VERSION', 'rb') as f:
 
 
 class TestStatusHandler(AsyncHTTPTestCase):
-
     def get_app(self):
         return app.app
 
@@ -35,6 +37,9 @@ class TestStatusHandler(AsyncHTTPTestCase):
                 s3_storage.s3.create_bucket(Bucket=s3_storage.PERM)
                 s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
 
+                self.io_loop.spawn_callback(app.producer)
+                self.io_loop.spawn_callback(app.consumer)
+
                 response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
 
                 body = json.loads(response.body)
@@ -43,7 +48,8 @@ class TestStatusHandler(AsyncHTTPTestCase):
                     body,
                     {
                         "upload_service": "up",
-                        "message_queue": "up",
+                        "message_queue_consumer": "up",
+                        "message_queue_producer": "up",
                         "long_term_storage": "up",
                         "quarantine_storage": "up",
                         "rejected_storage": "up"
@@ -63,7 +69,8 @@ class TestStatusHandler(AsyncHTTPTestCase):
                     body,
                     {
                         "upload_service": "up",
-                        "message_queue": "down",
+                        "message_queue_producer": "down",
+                        "message_queue_consumer": "down",
                         "long_term_storage": "down",
                         "quarantine_storage": "down",
                         "rejected_storage": "down"
@@ -184,13 +191,12 @@ class TestProducerAndConsumer:
 
     @asyncio.coroutine
     async def coroutine_test(self, method, exc_message='Stopping the iteration'):
-        with pytest.raises(Exception) as e:
+        with pytest.raises(StopLoopException, message=exc_message) as e:
             await method()
 
         assert str(e.value) == exc_message
 
     def test_producer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
-
         total_messages = 4
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
@@ -215,7 +221,7 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
                 )
-                app.mqc.produce(topic, message, True)
+                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
                 produced_messages.append(message)
 
             for m in produced_messages:
@@ -255,7 +261,7 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='failure'
                 )
-                app.mqc.produce(topic, message, True)
+                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
                 produced_messages.append(message)
 
             assert app.mqc.produce_calls_count == total_messages
@@ -292,7 +298,7 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='unknown'
                 )
-                app.mqc.produce(topic, message, True)
+                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
                 produced_messages.append(message)
 
             assert app.mqc.produce_calls_count == total_messages
@@ -336,7 +342,7 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
                 )
-                app.mqc.produce(topic, message, True)
+                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
 
             assert app.mqc.produce_calls_count == total_messages
             assert app.mqc.count_topic_messages(topic) == total_messages

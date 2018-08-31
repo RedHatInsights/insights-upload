@@ -17,7 +17,6 @@ from tests.fixtures import (
 
 
 class TestS3:
-
     @pytest.mark.withoutresponses
     def test_credentials_acl(self):
         try:

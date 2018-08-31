@@ -16,6 +16,27 @@ from utils import mnm
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 
 
+class StopLoopException(Exception):
+    """Used to stop iteration in coroutines during tests"""
+    pass
+
+
+class MockMessage:
+    """Mocks an aiokafka message."""
+    def __init__(self, value):
+        self.value = value
+
+
+class MockTopicPartition:
+    """Mocks aiokafka 'topic-partition' key.
+    
+    AIOkafka's consumer getmany() method returns a dict with 'TopicPartition'
+    as the key and a list of messages as the value
+    """
+    def __init__(self, topic):
+        self.topic = topic
+
+
 @pytest.fixture()
 def s3_mocked():
     with mock_s3():
@@ -128,7 +149,7 @@ class MyDeque(collections.deque):
         _original_len = super(MyDeque, self).__len__()
         if _original_len == 0 and self._stop_iteration == 0:
             self._stop_iteration = 2
-            raise Exception('Stopping the iteration')
+            raise StopLoopException('Stopping the iteration')
         elif _original_len == 0 and self._stop_iteration > 0:
             self._stop_iteration -= 1
         elif _original_len > 0:
@@ -136,11 +157,20 @@ class MyDeque(collections.deque):
 
         return _original_len
 
+    def __bool__(self):
+        return self.__len__() != 0
+
 
 @pytest.fixture
-def broker_stage_messages(s3_mocked):
+def produce_queue_mocked():
+    orig_queue = app.produce_queue
     app.produce_queue = MyDeque([], 999)
+    yield app.produce_queue
+    app.produce_queue = orig_queue
 
+
+@pytest.fixture
+def broker_stage_messages(s3_mocked, produce_queue_mocked):
     def set_url(_file, service, avoid_produce_queue=False, validation='success'):
         file_name = uuid.uuid4().hex
 
@@ -161,13 +191,11 @@ def broker_stage_messages(s3_mocked):
         }
 
         if not avoid_produce_queue:
-            app.produce_queue.append({'topic': service, 'msg': values})
+            produce_queue_mocked.append({'topic': service, 'msg': values})
 
         return values
 
-    yield set_url
-
-    app.produce_queue = collections.deque([], 999)
+    return set_url
 
 
 @pytest.yield_fixture
