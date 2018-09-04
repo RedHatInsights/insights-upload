@@ -13,7 +13,7 @@ pipeline {
         echo "Setting up environment..."
         sh '/bin/python36 -m pip install --user -r requirements.txt'
         echo "Testing with pytest..."
-        sh '/bin/python36 -m pytest'
+        sh '/bin/python36 -m pytest -rxXs -s -v'
         echo "Testing with flake8"
         sh '/bin/python36 -m flake8'
       }
