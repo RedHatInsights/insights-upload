@@ -25,8 +25,8 @@ def send_to_influxdb(values):
     values['namespace'] = NAMESPACE
 
     data = """
-    upload_stats,account_number={account},namespace={namespace} size={size}
-    upload_stats,account_number={account},namespace={namespace} validation={validation}
+    upload_stats,account_number={rh_account},namespace={namespace} size={size}
+    upload_stats,account_number={rh_account},namespace={namespace} validation={validation}
     """.format(**values)
 
     try:
