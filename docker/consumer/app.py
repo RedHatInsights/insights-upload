@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 from time import sleep
 from confluent_kafka import Consumer, Producer, KafkaError
@@ -10,8 +11,10 @@ logger = logging.getLogger('test-consumer')
 
 logger.info('connecting...')
 
+MQ = os.getenv('KAFKAMQ', 'kafka:29092')
+
 c = Consumer({
-    'bootstrap.servers': 'kafka:29092',
+    'bootstrap.servers': MQ,
     'group.id': 'testgroup',
     'default.topic.config': {
         'auto.offset.reset': 'smallest'
@@ -20,7 +23,7 @@ c = Consumer({
 
 c.subscribe(['testareno'])
 
-p = Producer({'bootstrap.servers': 'kafka:29092'})
+p = Producer({'bootstrap.servers': MQ})
 
 
 def delivery_report(err, msg):

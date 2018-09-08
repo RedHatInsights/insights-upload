@@ -36,13 +36,17 @@ problem back to the user via a log message or some other means.
 
 ## Getting Started
 
-The local development environment is configured using docker and docker-compose.
-The docker-compose file included in this repo will stand up a message queue, the
-upload-service app, and a consumer for a test queue. It is currently configured
-to simply fail all validations and send them to the rejected bucket. For testing,
-this should be fine.
+The local development environment can be either configured using docker and docker-compose,
+or by pointing the upload-service and consumer apps to an existing kafka server.
+The test queue consumer app is currently configured to simply fail all validations and send
+them to the rejected bucket. For testing, this should be fine.
 
-### Prequisites
+### Docker
+
+The docker-compose file included in this repo will stand up a message queue, the
+upload-service app, and a consumer for a test queue.
+
+#### Prequisites
 
     docker
     docker-compose
@@ -68,7 +72,7 @@ Also, you need to add the following environment variable, in order to run the te
 
     ASYNC_TEST_TIMEOUT=10
 
-### Installing
+#### Installing
 
 Once your environment variables are set on your localhost, bring up the stack:
 
@@ -83,11 +87,69 @@ This will stand up the full stack as well as initialize the topics in the messag
 queue that are necessary for testing. The Kiel library does not automatically create 
 topics in the MQ when they do not exist, so created them is critical.
 
-Upload a file to test to see if the system is working properly. Any file will
-work in testing as long as the `type` field is set properly. Use the `README.md`
-file in this repo if you'd like.
+### Bare metal
+
+It’s possible to run the apps manually and make them connect to an existing Kafka instance.
+
+#### Prerequisities
+
+    python3 (preferrably 3.6) with venv
+    zookeeper
+    kafka
+
+##### Queue
+
+You can either connect to a remote kafka server, or set up a local one. To spawn your own
+Kafka server, simply install it using your favorite package manager. To run Kafka, you need
+Zookeeper and JRE. First launch Zookeeper and then Kafka, possibly set them up as services
+so they relaunch on reboot.
+
+Make sure that your Kafka server can accept connection from your apps. Especially the
+`listeners` configuration value in your `server.properties` config file must be properly
+set. If Kafka runs on the same machine as the apps, the default config should work.
+
+Create the needed topics (advisor, available, testareno, uploadvalidation) in Kafka either
+manually by running following command for every topic, or use the `create_topics.py`
+Python script with a `ZOOKEEPER` environment variable set. For a local instance with
+default settings, this would be `ZOOKEEPER=localhost:2181`.
+
+    kafka-topics --create --topic "$TOPIC" --partitions 1 --replication-factor 1 --if-not-exists --zookeeper "$ZOOKEEPER_HOSTNAME:$ZOOKEEPER_PORT"
+
+    ZOOKEEPER=localhost:2181 python3 create_topics.py
+
+##### Python
+
+For every app (the upload service and the consumer) create a virtual environment and
+install its dependencies. Do this once in the upload-service root folder and once in
+the `docker/consumer` folder.
+
+    virtualenv . -p "$(which python3)"
+    source bin/activate
+    pip install -r requirements.txt
+
+#### Running
+
+Activate your Python virtual environment and run the upload service app pointing it
+to your Kafka server by `KAFKAMQ` environment variable. For a local instance with
+default settings this would be `KAFKAMQ=localhost:9092`.
+
+    source bin/activate
+    KAFKAMQ=localhost:9092 python app.py
+
+    cd docker/consumer
+    source bin/activate
+    KAFKAMQ=localhost:9092 python app.py
+
+## File upload
+
+Upload a file to see if the system is working properly. Any file will work in testing
+as long as the `type` field is set properly. Use the `README.md` file in this repo if
+you'd like.
 
     curl -vvvv -F "upload=@test-archive.tar.gz;type=application/vnd.redhat.testareno.something+tgz" localhost:8080/api/v1/upload
+
+If you’re running the upload service app directly and not in Docker, use port 8888 instead
+of 8080 in the aforementioned command.
 
 **NOTE**: The service **testareno** is important for local testing as it's the service queue
 that our test consumer is listening to.
@@ -100,15 +162,19 @@ To see the docker-compose logs:
 
     sudo docker-compose logs -f
 
+When running on bare metal, you’ll see the logs in your respective terminal windows with
+the running apps.
+
+
 ## Running with Tests
 
 Any new features added to the application should be accompanied by a Unittest/Pytest in `./tests`
 
 To test, you'll need a python virtualenv with python3 and to install requirements:
 
-    virtualenv . -p ($which python3)
+    virtualenv . -p "$(which python3)"
     source bin/activate
-    pip3 install -r requirements
+    pip3 install -r requirements.txt
 
 To test the app, activate the virtualenv and then run pytest and flake8.
 
