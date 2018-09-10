@@ -54,7 +54,7 @@ upload-service app, and a consumer for a test queue.
 
 By default, the app will use the insights S3 account. If you do not have access
 to this, you will need to provide your own AWS creds and buckets via environment
-variables OR choose to use localdisk rather than S3 by changing the code in app.py:
+variables:
 
     AWS_ACCESS_KEY_ID
     AWS_SECRET_ACCESS_KEY
@@ -64,9 +64,9 @@ variables OR choose to use localdisk rather than S3 by changing the code in app.
     S3_PERM
     S3_REJECT
     
-Or change the import to localdisk:
+Another option is to use localdisk rather than S3 by setting an environment variable:
 
-    from utils import localdisk as storage
+    STORAGE_DRIVER=localdisk
 
 Also, you need to add the following environment variable, in order to run the tests
 
