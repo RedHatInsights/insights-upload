@@ -112,7 +112,7 @@ def influx_db_error_mock():
 @pytest.fixture
 def influx_db_values():
     yield {
-        "account": "testing",
+        "rh_account": "testing",
         "size": "123",
         "validation": "is_valid"
     }
