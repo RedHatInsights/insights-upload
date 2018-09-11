@@ -1,8 +1,10 @@
 import hashlib
 import os
 import uuid
+from mock import patch
 from random import randint
 from string import ascii_letters, digits
+from time import time
 
 import pytest
 import responses
@@ -108,7 +110,7 @@ class TestLocalDisk:
         self.non_existing_folder = 'some-random-folder'
 
     def test_write(self, with_local_folders):
-        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        file_name, _ = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
@@ -118,10 +120,34 @@ class TestLocalDisk:
             local_storage.write(self._get_file_data(), self.non_existing_folder, self.temp_file_name)
 
     def test_write_no_folders_at_all(self, no_local_folders):
-        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        file_name, _ = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
+
+    @patch("utils.storage.localdisk.DummyCallback")
+    @patch("utils.storage.localdisk.open")
+    @patch("utils.storage.localdisk.os.path.isdir", return_value=True)
+    def test_write_return(self, isdir, open_mock, dummy_callback):
+        """
+        Write method returns a file name and a dummy callback instance.
+        """
+        result = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        assert result == (open_mock.return_value.__enter__.return_value.name,
+                          dummy_callback.return_value)
+
+    @patch("utils.storage.localdisk.open")
+    @patch("utils.storage.localdisk.os.path.isdir", return_value=True)
+    def test_write_callback(self, isdir, open_mock):
+        """
+        Dummy callback claims it has immediately done uploading.
+        """
+        url, callback = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+
+        now = time()
+        assert callback.percentage == 100
+        assert callback.time_last_updated < now
+        assert callback.time_last_updated == pytest.approx(now, abs=2)
 
     def test_ls(self, with_local_folders):
         local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
@@ -138,7 +164,7 @@ class TestLocalDisk:
             assert os.path.isdir(_dir) is True
 
     def test_copy(self, with_local_folders):
-        original_file_path = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        original_file_path, _ = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         original_file = open(original_file_path, 'rb')
         original_checksum = hashlib.md5(original_file.read()).hexdigest()
