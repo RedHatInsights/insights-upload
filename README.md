@@ -158,10 +158,16 @@ You should see messages in the docker logs where the upload-service sends a mess
 the consumer picks it up, returns a failure message, then the upload-service sends it to
 the permanent bucket.
 
-For debugging purposes it’s also possible to produce/consume Kafka messages with its own CLI tools.
+For debugging purposes it’s also possible to produce/consume Kafka messages with its
+own CLI tools. Run those using the following commands if you’re using Docker:
 
     sudo docker-compose exec kafka kafka-console-consumer --topic=testareno --bootstrap-server=localhost:29092
     sudo docker-compose exec kafka kafka-console-producer --topic=testareno --broker-list=localhost:29092
+
+Otherwise if you’re running on bare metal, use these commands:
+
+    kafka-console-consumer --topic=testareno --bootstrap-server=localhost:9092
+    kafka-console-producer --topic=testareno --broker-list=localhost:9092
 
 To see the docker-compose logs:
 
