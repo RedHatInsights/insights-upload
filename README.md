@@ -28,6 +28,18 @@ The key here for most services is to understand that in order to be notified
 of new, validated payloads, they **must** subscribe to the `available` topic on the message
 queue.
 
+### Message Format
+
+The message from the upload service is JSON as seen below:
+
+    {'principal': 'default_principal', 'rh_account': '000001', 'hash': 'abcdef123456', 'url': 'http://defaulttesturl', 'validation': 0, 'size': 0}   
+
+Principal is currently reflecting the org_id of the account, though that may change
+as we understand what is most useful regarding who uploaded a particular archive. The hash
+is a unique ID assigned to the uploaded file by the upload service. Everything else
+is fairly self-explanatory. The validation value is only used for metrics, so most end
+services will not utilize that.
+
 ### Errors
 
 The upload service will report back to the client HTTP errors if something goes
