@@ -8,3 +8,4 @@ moto
 sh
 pytest-responses
 aiokafka
+mock

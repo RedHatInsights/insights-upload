@@ -1,4 +1,7 @@
 import os
+from collections import namedtuple
+from time import time
+
 
 QUARANTINE = os.getenv('S3_QUARANTINE', 'insights-upload-quarantine')
 PERM = os.getenv('S3_PERM', 'insights-upload-perm-test')
@@ -8,6 +11,8 @@ dirs = [WORKDIR,
         os.path.join(WORKDIR, QUARANTINE),
         os.path.join(WORKDIR, PERM),
         os.path.join(WORKDIR, REJECT)]
+
+DummyCallback = namedtuple("DummyCallback", ["percentage", "time_last_updated"])
 
 
 def stage():
@@ -21,7 +26,8 @@ def write(data, dest, uuid):
     with open(os.path.join(WORKDIR, dest, uuid), 'w') as f:
         f.write(data)
         url = f
-    return url.name
+    callback = DummyCallback(percentage=100, time_last_updated=time())
+    return url.name, callback
 
 
 def ls(src, uuid):
