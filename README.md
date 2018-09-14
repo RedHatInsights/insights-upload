@@ -40,6 +40,10 @@ is a unique ID assigned to the uploaded file by the upload service. Everything e
 is fairly self-explanatory. The validation value is only used for metrics, so most end
 services will not utilize that.
 
+Services should return a message with the UID and the validation message to the `uploadvalidation` topic:
+
+    {'hash': 'abcdef123456', 'validation': 'success'} # or 'validation': 'failure'
+
 ### Errors
 
 The upload service will report back to the client HTTP errors if something goes
@@ -96,8 +100,7 @@ Once your environment variables are set on your localhost, bring up the stack:
     .\startup.ps1
     
 This will stand up the full stack as well as initialize the topics in the message 
-queue that are necessary for testing. The Kiel library does not automatically create 
-topics in the MQ when they do not exist, so created them is critical.
+queue that are necessary for testing.
 
 ### Bare metal
 
