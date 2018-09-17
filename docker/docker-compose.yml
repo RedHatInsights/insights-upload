@@ -30,7 +30,7 @@ services:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
       # set storage driver if not s3
-      # - STORAGE_DRIVER=localdisk
+      #- STORAGE_DRIVER=localdisk
       # set env variables if not using the default
       #- S3_PERM
       #- S3_REJECT
