@@ -365,7 +365,7 @@ class UploadHandler(tornado.web.RequestHandler):
         Validate upload, get service name, create UUID, save to local storage,
         then offload for async processing
         """
-        identity = False
+        identity = None
         if not self.request.files.get('upload'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
