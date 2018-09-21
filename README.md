@@ -20,7 +20,7 @@ The service runs in Openshift Dedicated.
 The upload service workflow is as follows:
 
   - The source client sends a payload of a specific MIME type to the upload service
-  - The upload service discovers the validating service via the MIME type, uplaods
+  - The upload service discovers the validating service via the MIME type, uploads
   it to a temporary S3 bucket and puts a message on the message queue in the format
   defined below
   - The validating service checks that the payload is safe and properly formatted
@@ -30,7 +30,7 @@ The upload service workflow is as follows:
   S3 bucket, and puts a message on the `available` queue notifying services that
   a new upload is available
   - If the validation fails, the upload service puts the payload on a rejected
-  S3 bucket. This is available for diagnosis later in the even it is needed.
+  S3 bucket. This is available for diagnosis later in the event it is needed.
 
 The key here for most services is to understand that in order to be notified
 of new, validated payloads, they **must** subscribe to the `available` topic on the message
@@ -56,8 +56,8 @@ Services should return a message with the UID and the validation message to the 
 
 The following topics are currently in use in the MQ service:
 
-  - advisor # for the advisor service
-  - testareno    # for testing the mq to upload service connection
+  - advisor             # for the advisor service
+  - testareno           # for testing the mq to upload service connection
   - uploadvalidation    # for responses from validation services
   - available           # for new uploads available to other services
 
@@ -108,12 +108,12 @@ Also, you need to add the following environment variable, in order to run the te
 #### Installing
 
 Once your environment variables are set on your localhost, bring up the stack. You
-may need to be root depending on your environment.:
+may need to be root depending on your environment.
 
     cd ./docker && docker-compose up -d
     
 This will stand up the full stack. You can follow logs in docker-compose with
-`docker-compose logs -f`
+`docker-compose logs -f`.
 
 ### Bare metal
 
@@ -163,10 +163,9 @@ default settings this would be `KAFKAMQ=localhost:9092`.
 
 Upload a file to see if the system is working properly. Any file will work in testing
 as long as the `type` field is set properly. Use the `README.md` file in this repo if
-you'd like. Auth is required for the upload even when running locally or you will
-encounter errors.
+you'd like.
 
-    curl -vvvv -u username:password -F "upload=@test-archive.tar.gz;type=application/vnd.redhat.testareno.something+tgz" localhost:8080/api/v1/upload
+    curl -vvvv -F "upload=@test-archive.tar.gz;type=application/vnd.redhat.testareno.something+tgz" localhost:8080/api/v1/upload
 
 If you’re running the upload service app directly and not in Docker, use port 8888 instead
 of 8080 in the aforementioned command.
