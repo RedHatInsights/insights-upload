@@ -19,10 +19,18 @@ The service runs in Openshift Dedicated.
 
 The upload service workflow is as follows:
 
-    client > upload service > service topic on the MQ > validating service >
-    uploadvalidation topic on the MQ with result >
-    URL for permanent file location added to `available` topic on the MQ >
-    Other service consume the `available` topic
+  - The source client sends a payload of a specific MIME type to the upload service
+  - The upload service discovers the validating service via the MIME type, uploads
+  it to a temporary S3 bucket and puts a message on the message queue in the format
+  defined below
+  - The validating service checks that the payload is safe and properly formatted
+  - The validating service returns a message via the `uploadvalidation` queue to the
+  upload service with a failure or success message
+  - If the validation succeeds, the upload service puts the payload on a permanent
+  S3 bucket, and puts a message on the `available` queue notifying services that
+  a new upload is available
+  - If the validation fails, the upload service puts the payload on a rejected
+  S3 bucket. This is available for diagnosis later in the event it is needed.
 
 The key here for most services is to understand that in order to be notified
 of new, validated payloads, they **must** subscribe to the `available` topic on the message
@@ -43,6 +51,15 @@ services will not utilize that.
 Services should return a message with the UID and the validation message to the `uploadvalidation` topic:
 
     {'hash': 'abcdef123456', 'validation': 'success'} # or 'validation': 'failure'
+
+### Current Active Topics
+
+The following topics are currently in use in the MQ service:
+
+  - advisor             # for the advisor service
+  - testareno           # for testing the mq to upload service connection
+  - uploadvalidation    # for responses from validation services
+  - available           # for new uploads available to other services
 
 ### Errors
 
@@ -90,17 +107,13 @@ Also, you need to add the following environment variable, in order to run the te
 
 #### Installing
 
-Once your environment variables are set on your localhost, bring up the stack:
+Once your environment variables are set on your localhost, bring up the stack. You
+may need to be root depending on your environment.
 
-    LINUX
-    cd ./docker && sh startup.sh
-
-    WINDOWS
-    cd .\docker
-    .\startup.ps1
+    cd ./docker && docker-compose up -d
     
-This will stand up the full stack as well as initialize the topics in the message 
-queue that are necessary for testing.
+This will stand up the full stack. You can follow logs in docker-compose with
+`docker-compose logs -f`.
 
 ### Bare metal
 
@@ -122,15 +135,6 @@ so they relaunch on reboot.
 Make sure that your Kafka server can accept connection from your apps. Especially the
 `listeners` configuration value in your `server.properties` config file must be properly
 set. If Kafka runs on the same machine as the apps, the default config should work.
-
-Create the needed topics (advisor, available, testareno, uploadvalidation) in Kafka either
-manually by running following command for every topic, or use the `create_topics.py`
-Python script with a `ZOOKEEPER` environment variable set. For a local instance with
-default settings, this would be `ZOOKEEPER=localhost:2181`.
-
-    kafka-topics --create --topic "$TOPIC" --partitions 1 --replication-factor 1 --if-not-exists --zookeeper "$ZOOKEEPER_HOSTNAME:$ZOOKEEPER_PORT"
-
-    ZOOKEEPER=localhost:2181 python3 create_topics.py
 
 ##### Python
 
