@@ -5,6 +5,32 @@ services:
     environment:
       - ZOOKEEPER_CLIENT_PORT=32181
       - ZOOKEEPER_SERVER_ID=1
+  minio:
+    image: minio/minio
+    command: server /data
+    volumes:
+      - '$MINIO_DATA_DIR:/data:Z'
+      - '$MINIO_CONFIG_DIR:/root/.minio:Z'
+    ports:
+      - 9000:9000
+    environment:
+      - MINIO_ACCESS_KEY=$MINIO_ACCESS_KEY
+      - MINIO_SECRET_KEY=$MINIO_SECRET_KEY
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add myminio http://minio:9000 $MINIO_ACCESS_KEY $MINIO_SECRET_KEY;
+      /usr/bin/mc mb myminio/insights-upload-perm-test;
+      /usr/bin/mc mb myminio/insights-upload-quarantine;
+      /usr/bin/mc mb myminio/insights-upload-upload-rejected;
+      /usr/bin/mc policy download myminio/insights-upload-perm-test;
+      /usr/bin/mc policy download myminio/insights-upload-quarantine;
+      /usr/bin/mc policy download myminio/insights-upload-upload-rejected;
+      exit 0;
+      "
   kafka:
     image: confluentinc/cp-kafka
     ports:
@@ -29,8 +55,9 @@ services:
     volumes:
       - ..:/usr/src/app:Z
     environment:
-      - AWS_ACCESS_KEY_ID
-      - AWS_SECRET_ACCESS_KEY
+      - AWS_ACCESS_KEY_ID=$MINIO_ACCESS_KEY
+      - AWS_SECRET_ACCESS_KEY=$MINIO_SECRET_KEY
+      - S3_ENDPOINT_URL=http://minio:9000
       # set storage driver if not s3
       #- STORAGE_DRIVER=localdisk
       # set env variables if not using the default
@@ -39,3 +66,4 @@ services:
       #- S3_QUARANTINE
     depends_on:
       - kafka
+      - minio
