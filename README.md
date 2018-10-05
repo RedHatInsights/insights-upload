@@ -51,6 +51,14 @@ services will not utilize that.
 Services should return a message with the UID and the validation message to the `uploadvalidation` topic:
 
     {'hash': 'abcdef123456', 'validation': 'success'} # or 'validation': 'failure'
+    
+Fields:
+
+  - principal:  The uploading org id
+  - rh_account: The account number used to upload. Can be used to separate data for tenancy purposes.
+  - hash:       Unique ID provided to the payload. This ID will be used for the life of the object.
+  - url:        URL for the location the payload can be downloaded from
+  - validation: Validation status of the object
 
 ### Current Active Topics
 
