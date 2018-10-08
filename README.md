@@ -41,6 +41,15 @@ queue.
 The message from the upload service is JSON as seen below:
 
     {'principal': 'default_principal', 'rh_account': '000001', 'hash': 'abcdef123456', 'url': 'http://defaulttesturl', 'validation': 0, 'size': 0}   
+    
+Fields:
+
+  - principal:  The uploading org id
+  - rh_account: The account number used to upload. Can be used to separate data for tenancy purposes.
+  - hash:       Unique ID provided to the payload. This ID will be used for the life of the object.
+  - url:        URL for the location the payload can be downloaded from
+  - validation: Validation status of the object
+  - size: Size of the payload in bytes
 
 Principal is currently reflecting the org_id of the account, though that may change
 as we understand what is most useful regarding who uploaded a particular archive. The hash
@@ -54,11 +63,8 @@ Services should return a message with the UID and the validation message to the 
     
 Fields:
 
-  - principal:  The uploading org id
-  - rh_account: The account number used to upload. Can be used to separate data for tenancy purposes.
-  - hash:       Unique ID provided to the payload. This ID will be used for the life of the object.
-  - url:        URL for the location the payload can be downloaded from
-  - validation: Validation status of the object
+  - hash: Unique ID being addresed by validation message
+  - validation: Either succes or failure based on whether the payload passed validation or not
 
 ### Current Active Topics
 
