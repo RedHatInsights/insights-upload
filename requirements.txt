@@ -3,6 +3,7 @@ boto3==1.7.*
 requests
 pytest
 pytest-cov
+pytest-html
 flake8
 moto
 sh
