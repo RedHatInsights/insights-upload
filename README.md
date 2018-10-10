@@ -40,16 +40,18 @@ queue.
 
 The message from the upload service is JSON as seen below:
 
-    {'principal': 'default_principal', 'rh_account': '000001', 'hash': 'abcdef123456', 'url': 'http://defaulttesturl', 'validation': 0, 'size': 0}   
+    {'rh_account': '123456', 'principal': 'test_org', 'validation': 1, 'hash': '63d067a67569401c804a0bea695e6ef9', 'size': 356, 'service': 'testareno', 'url': '/tmp/uploads/insights-upload-quarantine/63d067a67569401c804a0bea695e6ef9'}
+   
     
 Fields:
 
-  - principal:  The uploading org id
   - rh_account: The account number used to upload. Can be used to separate data for tenancy purposes.
-  - hash:       Unique ID provided to the payload. This ID will be used for the life of the object.
-  - url:        URL for the location the payload can be downloaded from
+  - principal:  The uploading org id
   - validation: Validation status of the object
-  - size: Size of the payload in bytes
+  - hash:       Unique ID provided to the payload. This ID will be used for the life of the object.
+  - size:       Size of the payload in bytes
+  - service:    The name of the service to do the validation
+  - url:        URL for the location the payload can be downloaded from
 
 Principal is currently reflecting the org_id of the account, though that may change
 as we understand what is most useful regarding who uploaded a particular archive. The hash
