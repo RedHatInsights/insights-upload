@@ -225,7 +225,7 @@ class TestProducerAndConsumer:
                 produced_messages.append(message)
 
             for m in produced_messages:
-                assert s3_storage.ls(s3_storage.QUARANTINE, m['hash'])['ResponseMetadata']['HTTPStatusCode'] == 200
+                assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert app.mqc.produce_calls_count == total_messages
             assert app.mqc.count_topic_messages(topic) == total_messages
@@ -236,10 +236,10 @@ class TestProducerAndConsumer:
 
             for m in produced_messages:
                 with pytest.raises(ClientError) as e:
-                    s3_storage.ls(s3_storage.QUARANTINE, m['hash'])
+                    s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])
                 assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
 
-                assert s3_storage.ls(s3_storage.PERM, m['hash'])['ResponseMetadata']['HTTPStatusCode'] == 200
+                assert s3_storage.ls(s3_storage.PERM, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert app.mqc.consume_calls_count > 0
             assert app.mqc.consume_return_messages_count == 1
@@ -273,10 +273,10 @@ class TestProducerAndConsumer:
 
             for m in produced_messages:
                 with pytest.raises(ClientError) as e:
-                    s3_storage.ls(s3_storage.QUARANTINE, m['hash'])
+                    s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])
                 assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
 
-                assert s3_storage.ls(s3_storage.REJECT, m['hash'])['ResponseMetadata']['HTTPStatusCode'] == 200
+                assert s3_storage.ls(s3_storage.REJECT, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert app.mqc.consume_calls_count > 0
             assert app.mqc.consume_return_messages_count == 1

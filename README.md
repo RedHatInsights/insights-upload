@@ -40,7 +40,7 @@ queue.
 
 The message from the upload service is JSON as seen below:
 
-    {'rh_account': '123456', 'principal': 'test_org', 'validation': 1, 'hash': '63d067a67569401c804a0bea695e6ef9', 'size': 356, 'service': 'testareno', 'url': '/tmp/uploads/insights-upload-quarantine/63d067a67569401c804a0bea695e6ef9'}
+    {'rh_account': '123456', 'principal': 'test_org', 'validation': 1, 'payload_id': '52df9f748eabcfea', 'size': 356, 'service': 'testareno', 'url': '/tmp/uploads/insights-upload-quarantine/52df9f748eabcfea'}
    
     
 Fields:
@@ -48,24 +48,25 @@ Fields:
   - rh_account: The account number used to upload. Can be used to separate data for tenancy purposes.
   - principal:  The uploading org id
   - validation: Validation status of the object
-  - hash:       Unique ID provided to the payload. This ID will be used for the life of the object.
+  - payload_id: Unique ID provided to the payload created by 3Scale. This ID will be used for the life of the object.
+  - hash:       Legacy key name. Provides the same UID as payload_id. Will be deprecated.
   - size:       Size of the payload in bytes
   - service:    The name of the service to do the validation
   - url:        URL for the location the payload can be downloaded from
 
 Principal is currently reflecting the org_id of the account, though that may change
-as we understand what is most useful regarding who uploaded a particular archive. The hash
-is a unique ID assigned to the uploaded file by the upload service. Everything else
+as we understand what is most useful regarding who uploaded a particular archive. The payload_id 
+is a unique ID assigned to the uploaded file by the 3Scale gateway. Everything else
 is fairly self-explanatory. The validation value is only used for metrics, so most end
 services will not utilize that.
 
 Services should return a message with the UID and the validation message to the `uploadvalidation` topic:
 
-    {'hash': 'abcdef123456', 'validation': 'success'} # or 'validation': 'failure'
+    {'payload_id': '52df9f748eabcfea', 'validation': 'success'} # or 'validation': 'failure'
     
 Fields:
 
-  - hash: Unique ID being addresed by validation message
+  - payload_id: Unique ID being addresed by validation message
   - validation: Either succes or failure based on whether the payload passed validation or not
 
 ### Current Active Topics
