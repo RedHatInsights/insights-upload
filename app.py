@@ -4,7 +4,6 @@ import json
 import logging
 import os
 import re
-import uuid
 import base64
 
 from concurrent.futures import ThreadPoolExecutor
