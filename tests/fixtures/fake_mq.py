@@ -90,7 +90,7 @@ class FakeMQ:
     @gen.coroutine
     def getmany(self, avoid_iteration_control=False) -> Dict:
         # At the moment, this is the only topic we consume from ...
-        topic = "uploadvalidation"
+        topic = "platform.upload.validation"
 
         self._raise_if_need_to(self.consume_calls_count, avoid_iteration_control)
         self.consume_calls_count += 1

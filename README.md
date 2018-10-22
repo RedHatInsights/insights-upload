@@ -24,7 +24,7 @@ The upload service workflow is as follows:
   it to a temporary S3 bucket and puts a message on the message queue in the format
   defined below
   - The validating service checks that the payload is safe and properly formatted
-  - The validating service returns a message via the `uploadvalidation` queue to the
+  - The validating service returns a message via the `platform.upload.validation` queue to the
   upload service with a failure or success message
   - If the validation succeeds, the upload service puts the payload on a permanent
   S3 bucket, and puts a message on the `available` queue notifying services that
@@ -59,7 +59,7 @@ is a unique ID assigned to the uploaded file by the upload service. Everything e
 is fairly self-explanatory. The validation value is only used for metrics, so most end
 services will not utilize that.
 
-Services should return a message with the UID and the validation message to the `uploadvalidation` topic:
+Services should return a message with the UID and the validation message to the `platform.upload.validation` topic:
 
     {'hash': 'abcdef123456', 'validation': 'success'} # or 'validation': 'failure'
     
@@ -72,10 +72,10 @@ Fields:
 
 The following topics are currently in use in the MQ service:
 
-  - advisor             # for the advisor service
-  - testareno           # for testing the mq to upload service connection
-  - uploadvalidation    # for responses from validation services
-  - available           # for new uploads available to other services
+  - platform.upload.advisor             # for the advisor service
+  - platform.upload.testareno           # for testing the mq to upload service connection
+  - platform.upload.validation    # for responses from validation services
+  - platform.upload.available           # for new uploads available to other services
 
 ### Errors
 
