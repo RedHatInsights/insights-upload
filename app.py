@@ -185,8 +185,8 @@ async def handle_file(msgs):
             logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value))
             continue
 
-        if ('payload_id' or 'hash') not in data:
-            logger.error("payload_id not in message. Payload not removed from quarantine.")
+        if 'payload_id' not in data and 'hash' not in data:
+            logger.error("payload_id or hash not in message. Payload not removed from quarantine.")
             return
 
         # get the payload_id. Getting the hash is temporary until consumers update
