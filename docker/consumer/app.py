@@ -55,7 +55,7 @@ while True:
     result = json.loads(msg.value().decode('utf-8'))
 
     validation = {
-        'hash': result['hash'],
+        'payload_id': result['payload_id'],
         'validation': 'failure'
     }
 
