@@ -54,11 +54,13 @@ DUMMY_VALUES = {
     'size': 0
 }
 
+VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
+
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 mqc = AIOKafkaConsumer(
-    'uploadvalidation', loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
+    VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
     group_id=MQ_GROUP_ID
 )
 mqp = AIOKafkaProducer(
@@ -97,7 +99,7 @@ class MQStatus(object):
 
 
 async def consumer():
-    """Consume indefinitely from the 'uploadvalidation' queue.
+    """Consume indefinitely from the validation queue.
     """
     MQStatus.mqc_connected = False
     while True:
@@ -117,7 +119,7 @@ async def consumer():
         try:
             data = await mqc.getmany()
             for tp, msgs in data.items():
-                if tp.topic == 'uploadvalidation':
+                if tp.topic == VALIDATION_QUEUE:
                     await handle_file(msgs)
         except KafkaError:
             logger.exception('Consume client hit error, triggering re-connect...')
@@ -177,7 +179,7 @@ async def handle_file(msgs):
     storage.copy operations are not async so we offload to the executor
 
     Arguments:
-        msgs -- list of kafka messages consumed on 'uploadvalidation' topic
+        msgs -- list of kafka messages consumed on validation topic
     """
     for msg in msgs:
         try:
@@ -332,7 +334,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if url:
             values['url'] = url
 
-            produce_queue.append({'topic': service, 'msg': values})
+            produce_queue.append({'topic': 'platform.upload.' + service, 'msg': values})
             logger.info(
                 "Data for hash [%s] put on produce queue (qsize: %d)",
                 hash_value, len(produce_queue)

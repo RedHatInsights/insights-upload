@@ -191,7 +191,7 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
         }
 
         if not avoid_produce_queue:
-            produce_queue_mocked.append({'topic': service, 'msg': values})
+            produce_queue_mocked.append({'topic': 'platform.upload.' + service, 'msg': values})
 
         return values
 

@@ -186,7 +186,7 @@ class TestProducerAndConsumer:
 
     @staticmethod
     def _create_message_s3(_file, _stage_message, avoid_produce_queue=False, validation='success',
-                           topic='uploadvalidation'):
+                           topic='platform.upload.validation'):
         return _stage_message(_file, topic, avoid_produce_queue, validation)
 
     @asyncio.coroutine
@@ -214,7 +214,7 @@ class TestProducerAndConsumer:
     def test_consumer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
-        topic = 'uploadvalidation'
+        topic = 'platform.upload.validation'
         produced_messages = []
         with FakeMQ():
             for _ in range(total_messages):
@@ -252,7 +252,7 @@ class TestProducerAndConsumer:
     def test_consumer_with_validation_failure(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
-        topic = 'uploadvalidation'
+        topic = 'platform.upload.validation'
         s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
         produced_messages = []
 
@@ -289,7 +289,7 @@ class TestProducerAndConsumer:
     def test_consumer_with_validation_unknown(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
-        topic = 'uploadvalidation'
+        topic = 'platform.upload.validation'
         s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
         produced_messages = []
 
@@ -335,7 +335,7 @@ class TestProducerAndConsumer:
     def test_consumer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
-        topic = 'uploadvalidation'
+        topic = 'platform.upload.validation'
 
         with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2):
             for _ in range(total_messages):

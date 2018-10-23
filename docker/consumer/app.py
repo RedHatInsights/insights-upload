@@ -21,7 +21,7 @@ c = Consumer({
     }
 })
 
-c.subscribe(['testareno'])
+c.subscribe(['platform.upload.testareno'])
 
 p = Producer({'bootstrap.servers': MQ})
 
@@ -63,5 +63,5 @@ while True:
     logger.info('Replying with: {}'.format(json.dumps(validation)))
 
     p.poll(0)
-    p.produce('uploadvalidation', json.dumps(validation), callback=delivery_report)
+    p.produce('platform.upload.validation', json.dumps(validation), callback=delivery_report)
     p.flush()
