@@ -16,6 +16,7 @@ import tornado.web
 from tornado.ioloop import IOLoop
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
+from aiokafka.helpers import create_ssl_context
 from kafka.errors import KafkaError
 from utils import mnm
 
@@ -56,15 +57,24 @@ DUMMY_VALUES = {
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 
 # Message Queue
+
+# Set up MQ SSL certs
+ssl_context = create_ssl_context(
+    ca_file="/opt/certs/ca.crt"
+    cert_file="/opt/certs/user.crt"
+    key_file="/opt/certs/user.key"
+)
+
+
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 mqc = AIOKafkaConsumer(
     VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
-    group_id=MQ_GROUP_ID
+    group_id=MQ_GROUP_ID, security_protocol="SSL", ssl_context=ssl_context
 )
 mqp = AIOKafkaProducer(
     loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
-    connections_max_idle_ms=None
+    connections_max_idle_ms=None, security_protocol="SSL", ssl_context=ssl_context
 )
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
