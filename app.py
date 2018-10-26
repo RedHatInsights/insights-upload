@@ -44,6 +44,12 @@ MAX_WORKERS = int(os.getenv('MAX_WORKERS', 50))
 # Maximum time to wait for an archive to upload to storage
 STORAGE_UPLOAD_TIMEOUT = int(os.getenv('STORAGE_UPLOAD_TIMEOUT', 60))
 
+
+# CA certs for MQ
+CAFILE = os.getenv("CAFILE", '/opt/certs/ca.crt')
+CERTFILE = os.getenv("CERTFILE", '/opt/certs/user.crt')
+KEYFILE = os.getenv("KEYFILE", '/opt/certs/user.key')
+
 # these are dummy values since we can't yet get a principal or rh_account
 DUMMY_VALUES = {
     'principal': 'default_principal',
@@ -60,9 +66,9 @@ VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 
 # Set up MQ SSL certs
 ssl_context = create_ssl_context(
-    ca_file="/opt/certs/ca.crt",
-    cert_file="/opt/certs/user.crt",
-    key_file="/opt/certs/user.key"
+    cafile=CAFILE,
+    certfile=CERTFILE,
+    keyfile=KEYFILE
 )
 
 
