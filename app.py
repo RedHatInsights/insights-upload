@@ -60,8 +60,8 @@ VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 
 # Set up MQ SSL certs
 ssl_context = create_ssl_context(
-    ca_file="/opt/certs/ca.crt"
-    cert_file="/opt/certs/user.crt"
+    ca_file="/opt/certs/ca.crt",
+    cert_file="/opt/certs/user.crt",
     key_file="/opt/certs/user.key"
 )
 
