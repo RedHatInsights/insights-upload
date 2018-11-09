@@ -64,7 +64,8 @@ class TestPost(AsyncHTTPTestCase):
         size = 123
         request = Mock(**{"files": {"upload": [{"content_type": "application/vnd.redhat.testareno.something+tgz",
                                                 "body": ""}]},
-                          "headers": {"Content-Length": size}})
+                                    "headers": {"Content-Length": size,
+                                                "x-rh-insights-request-id": "test"}})
         handler = UploadHandler(app, request)
 
         yield handler.post()

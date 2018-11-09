@@ -282,10 +282,6 @@ class UploadHandler(tornado.web.RequestHandler):
         success = False
         upload_start = time()
 
-        if payload_id is None:
-            logger.error("No payload_id assigned. Upload Failed")
-            return
-
         try:
             url, callback = await IOLoop.current().run_in_executor(
                 None, storage.write, filename, storage.QUARANTINE, payload_id
@@ -388,11 +384,24 @@ class UploadHandler(tornado.web.RequestHandler):
         then offload for async processing
         """
         identity = None
+
         if not self.request.files.get('upload'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
             return
+
+        payload_id = self.request.headers.get('x-rh-insights-request-id')
+
+        if payload_id is None:
+            msg = "No payload_id assigned. Upload Failed"
+            logger.error(msg)
+            self.set_header("Content-Type", "text/plain")
+            self.set_status(400)
+            self.write(msg)
+            return
+
         invalid = self.upload_validation()
+
         if invalid:
             self.set_status(invalid[0], invalid[1])
             return
@@ -404,7 +413,6 @@ class UploadHandler(tornado.web.RequestHandler):
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 identity = header['identity']
             size = int(self.request.headers['Content-Length'])
-            payload_id = self.request.headers.get('x-rh-insights-request-id')
             body = self.request.files['upload'][0]['body']
 
             filename = await IOLoop.current().run_in_executor(None, self.write_data, body)

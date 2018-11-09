@@ -89,6 +89,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
             url="http://localhost:8888/api/v1/upload", data={},
             files={file_field_name: (file_name, io.BytesIO(os.urandom(file_size)), mime_type)} if file_name else None
         )
+        request.headers["x-rh-insights-request-id"] = "test"
 
         return request.prepare()
 
