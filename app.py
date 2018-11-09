@@ -5,6 +5,7 @@ import logging
 import os
 import re
 import base64
+import sys
 
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
@@ -18,12 +19,20 @@ from tornado.ioloop import IOLoop
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
 from utils import mnm
+from logstash_formatter import LogstashFormatterV1
 
 # Logging
-logging.basicConfig(
-    level=os.getenv("LOGLEVEL", "INFO"),
-    format="%(asctime)s %(threadName)s %(levelname)s -- %(message)s"
-)
+if any("KUBERNETES" in k for k in os.environ):
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(LogstashFormatterV1())
+    logging.root.setLevel(os.getenv("LOGLEVEL", "INFO"))
+    logging.root.addHandler(handler)
+else:
+    logging.basicConfig(
+        level=os.getenv("LOGLEVEL", "INFO"),
+        format="%(threadName)s %(levelname)s %(name)s - %(message)s"
+    )
+
 logger = logging.getLogger('upload-service')
 
 # Set Storage driver to use
@@ -464,6 +473,7 @@ app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
 def main():
     sleep(10)
     app.listen(LISTEN_PORT)
+    logger.info(f"Web server listening on port {LISTEN_PORT}")
     loop = IOLoop.current()
     loop.set_default_executor(thread_pool_executor)
     loop.spawn_callback(consumer)

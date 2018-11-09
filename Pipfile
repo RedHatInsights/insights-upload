@@ -15,6 +15,7 @@ tornado = "*"
 requests = "*"
 botocore = "*"
 aiokafka = "*"
+logstash_formatter = "*"
 
 [requires]
 python_version = "3.6"
