@@ -8,6 +8,10 @@ pylint = "*"
 pytest = "*"
 "flake8" = "*"
 "pep8" = "*"
+mock = "*"
+moto = "*"
+responses = "*"
+sh = "*"
 
 [packages]
 tornado = "*"
