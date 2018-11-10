@@ -18,6 +18,7 @@ from tests.fixtures import (
 ) # flake8: noqa
 from tests.fixtures.fake_mq import FakeMQ
 from utils.storage import s3 as s3_storage
+from mock import patch
 
 client = AsyncHTTPClient()
 with open('VERSION', 'rb') as f:
@@ -317,6 +318,7 @@ class TestProducerAndConsumer:
             assert app.mqc.trying_to_connect_failures_calls == 0
             assert len(app.produce_queue) == 0
 
+    @patch("app.RETRY_INTERVAL", 0.01)
     def test_producer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
@@ -333,6 +335,7 @@ class TestProducerAndConsumer:
             assert app.mqp.disconnect_in_operation_called is True
             assert app.mqp.trying_to_connect_failures_calls == 1
 
+    @patch("app.RETRY_INTERVAL", 0.01)
     def test_consumer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4

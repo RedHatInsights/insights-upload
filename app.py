@@ -45,6 +45,7 @@ content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
 MAX_LENGTH = int(os.getenv('MAX_LENGTH', 11010048))
 LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
+RETRY_INTERVAL = 5  # seconds
 
 # Maximum workers for threaded execution
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 50))
@@ -120,7 +121,7 @@ async def consumer():
                 MQStatus.mqc_connected = True
             except KafkaError:
                 logger.exception('Consume client hit error, triggering re-connect...')
-                await asyncio.sleep(5)
+                await asyncio.sleep(RETRY_INTERVAL)
                 continue
 
         # Consume
@@ -154,7 +155,7 @@ async def producer():
                 MQStatus.mqp_connected = True
             except KafkaError:
                 logger.exception('Producer client hit error, triggering re-connect...')
-                await asyncio.sleep(5)
+                await asyncio.sleep(RETRY_INTERVAL)
                 continue
 
         # Pull items off our queue to produce
