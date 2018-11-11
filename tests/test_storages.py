@@ -14,8 +14,8 @@ from utils import mnm
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 from utils.storage.s3 import UploadProgress
 from tests.fixtures import (
-    s3_mocked, local_file, with_local_folders, no_local_folders, influx_db_mock, influx_db_error_mock, influx_db_values,
-    influx_db_credentials, influx_db_namespace)  # flake8: noqa
+    s3_mocked, local_file, with_local_folders, no_local_folders, influx_db_values,
+    influx_db_namespace)  # flake8: noqa
 
 
 class TestS3:
@@ -187,23 +187,61 @@ class TestLocalDisk:
 
 class TestInfluxDB:
 
-    def test_send_to_influxdb(self, influx_db_mock, influx_db_credentials, influx_db_values):
-        method_response = mnm.send_to_influxdb(influx_db_values)
+    @responses.activate
+    @patch("utils.mnm.INFLUXDB_PLATFORM", "http://some.influx.endpoint.com/write?db=platform")
+    def test_send_to_influxdb(self, influx_db_values):
+        responses.add(
+            responses.POST, mnm.INFLUXDB_PLATFORM,
+            json={"message": "saved"}, status=201
+        )
 
-        assert method_response is None
-        assert len(responses.calls) == 1
-        assert responses.calls[0].request.url == influx_db_mock
-        assert responses.calls[0].response.text == '{"message": "saved"}'
+        old_user, old_pass = mnm.INFLUX_USER, mnm.INFLUX_PASS
+        mnm.INFLUX_USER = mnm.INFLUX_PASS = "test"
 
-    def test_send_to_influxdb_no_credentials(self, influx_db_mock, influx_db_values):
-        method_response = mnm.send_to_influxdb(influx_db_values)
+        try:
+            method_response = mnm.send_to_influxdb(influx_db_values)
 
-        assert method_response is None
-        assert len(responses.calls) == 0
+            assert method_response is None
+            assert len(responses.calls) == 1
+            assert responses.calls[0].response.text == '{"message": "saved"}'
+        finally:
+            mnm.INFLUX_USER, mnm.INFLUX_PASS = old_user, old_pass
 
-    def test_send_to_influxdb_down(self, influx_db_error_mock, influx_db_credentials, influx_db_values):
-        method_response = mnm.send_to_influxdb(influx_db_values)
-        assert method_response is None
-        assert len(responses.calls) == 1
-        assert responses.calls[0].request.url == influx_db_error_mock
-        assert responses.calls[0].response.text == '{"message": "error"}'
+    @responses.activate
+    @patch("utils.mnm.INFLUXDB_PLATFORM", "http://some.influx.endpoint.com/write?db=platform")
+    def test_send_to_influxdb_no_credentials(self, influx_db_values):
+        old_user, old_pass = mnm.INFLUX_USER, mnm.INFLUX_PASS
+        mnm.INFLUX_USER = mnm.INFLUX_PASS = None
+
+        responses.add(
+            responses.POST, mnm.INFLUXDB_PLATFORM,
+            json={"message": "saved"}, status=201
+        )
+
+        try:
+            method_response = mnm.send_to_influxdb(influx_db_values)
+
+            assert method_response is None
+            assert len(responses.calls) == 0
+        finally:
+            mnm.INFLUX_USER, mnm.INFLUX_PASS = old_user, old_pass
+
+    @responses.activate
+    @patch("utils.mnm.INFLUXDB_PLATFORM", "http://some.influx.endpoint.com/write?db=platform")
+    def test_send_to_influxdb_down(self, influx_db_values):
+        responses.add(
+            responses.POST, mnm.INFLUXDB_PLATFORM,
+            json={"message": "error"}, status=201
+        )
+
+        old_user, old_pass = mnm.INFLUX_USER, mnm.INFLUX_PASS
+        mnm.INFLUX_USER = mnm.INFLUX_PASS = "test"
+
+        try:
+            method_response = mnm.send_to_influxdb(influx_db_values)
+
+            assert method_response is None
+            assert len(responses.calls) == 1
+            assert responses.calls[0].response.text == '{"message": "error"}'
+        finally:
+            mnm.INFLUX_USER, mnm.INFLUX_PASS = old_user, old_pass

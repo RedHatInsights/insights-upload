@@ -84,19 +84,6 @@ def no_local_folders():
 
 
 @pytest.fixture
-def influx_db_mock():
-    # responses.reset()
-    mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
-    responses.add(
-        responses.POST, mnm.INFLUXDB_PLATFORM,
-        json={"message": "saved"}, status=201
-    )
-
-    yield mnm.INFLUXDB_PLATFORM
-    mnm.INFLUXDB_PLATFORM = os.getenv('INFLUXDB_PLATFORM')
-
-
-@pytest.fixture
 def influx_db_error_mock():
     # responses.reset()
     mnm.INFLUXDB_PLATFORM = 'http://some.influx.endpoint.com/write?db=platform'
