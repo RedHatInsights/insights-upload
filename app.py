@@ -45,7 +45,7 @@ content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
 # set max length to 10.5 MB (one MB larger than peak)
 MAX_LENGTH = int(os.getenv('MAX_LENGTH', 11010048))
 LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
-RETRY_INTERVAL = 5  # seconds
+RETRY_INTERVAL = int(os.getenv('RETRY_INTERVAL', 5))  # seconds
 
 # Maximum workers for threaded execution
 MAX_WORKERS = int(os.getenv('MAX_WORKERS', 50))
