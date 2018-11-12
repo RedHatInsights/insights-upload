@@ -7,7 +7,7 @@ from tornado import gen
 from tests.fixtures import MockMessage, MockTopicPartition, StopLoopException
 
 
-class FakeMQ:
+class FakeMQ(object):
     """
     :arg connection_failing_attempt_countdown: how many times you want to try to "connect" to the broker
                                                 until gets positive return, e.g: if set to 4, NoBrokersError will be

@@ -18,7 +18,8 @@ from tests.fixtures import (
     influx_db_namespace)  # flake8: noqa
 
 
-class TestS3:
+class TestS3(object):
+
     @pytest.mark.withoutresponses
     def test_credentials_acl(self):
         try:
@@ -99,7 +100,7 @@ class TestS3:
         assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
 
 
-class TestLocalDisk:
+class TestLocalDisk(object):
 
     @staticmethod
     def _get_file_data():
@@ -185,7 +186,7 @@ class TestLocalDisk:
         copied_file.close()
 
 
-class TestInfluxDB:
+class TestInfluxDB(object):
 
     @responses.activate
     @patch("utils.mnm.INFLUXDB_PLATFORM", "http://some.influx.endpoint.com/write?db=platform")
