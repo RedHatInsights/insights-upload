@@ -41,7 +41,9 @@ pycparser==2.19
 pycryptodome==3.7.0
 pyflakes==2.0.0
 pylint==2.1.1
-pytest==3.10.0
+pytest==3.10.1
+pytest-html==1.19.0
+pytest-metadata==1.7.0
 python-dateutil==2.7.5
 python-jose==2.0.2
 pytz==2018.7
