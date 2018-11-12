@@ -12,11 +12,8 @@ from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 
 import app
-from tests.fixtures import (
-    StopLoopException, local_file, s3_mocked, broker_stage_messages, event_loop,
-    produce_queue_mocked
-) # flake8: noqa
 from tests.fixtures.fake_mq import FakeMQ
+from tests.fixtures import StopLoopException
 from utils.storage import s3 as s3_storage
 from mock import patch
 

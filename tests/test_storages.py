@@ -13,9 +13,6 @@ from botocore.exceptions import ClientError
 from utils import mnm
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 from utils.storage.s3 import UploadProgress
-from tests.fixtures import (
-    s3_mocked, local_file, with_local_folders, no_local_folders, influx_db_values,
-    influx_db_namespace)  # flake8: noqa
 
 
 class TestS3(object):
