@@ -213,7 +213,7 @@ async def handle_file(msgs):
             logger.info(url)
             produce_queue.append(
                 {
-                    'topic': 'available',
+                    'topic': 'platform.upload.available',
                     'msg': {'url': url,
                             'payload_id': payload_id}
                 }
