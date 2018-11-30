@@ -77,7 +77,7 @@ class TestStatusHandler(AsyncHTTPTestCase):
                 self.io_loop.spawn_callback(app.producer)
                 self.io_loop.spawn_callback(app.consumer)
 
-                response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
+                response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/status'), method='GET')
 
                 body = json.loads(response.body)
 
@@ -98,7 +98,7 @@ class TestStatusHandler(AsyncHTTPTestCase):
         with FakeMQ(is_down=True):
             with moto.mock_s3():
                 s3_storage.s3 = boto3.client('s3')
-                response = yield self.http_client.fetch(self.get_url('/api/v1/status'), method='GET')
+                response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/status'), method='GET')
 
                 body = json.loads(response.body)
 
@@ -123,7 +123,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         # Build HTTP Request so that Tornado can recognize and use the payload test
         request = requests.Request(
-            url="http://localhost:8888/api/v1/upload", data={},
+            url="http://localhost:8888/r/insights/platform/upload/api/v1/upload", data={},
             files={file_field_name: (file_name, io.BytesIO(os.urandom(file_size)), mime_type)} if file_name else None
         )
         request.headers["x-rh-insights-request-id"] = "test"
@@ -135,27 +135,27 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
     @gen_test
     def test_root_get(self):
-        response = yield self.http_client.fetch(self.get_url('/'), method='GET')
+        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload'), method='GET')
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body, b'boop')
-        response = yield self.http_client.fetch(self.get_url('/'), method='OPTIONS')
+        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload'), method='OPTIONS')
         self.assertEqual(response.headers['Allow'], 'GET, HEAD, OPTIONS')
 
     @gen_test
     def test_upload_get(self):
-        response = yield self.http_client.fetch(self.get_url('/api/v1/upload'), method='GET')
+        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/upload'), method='GET')
         self.assertEqual(response.body, b"Accepted Content-Types: gzipped tarfile, zip file")
 
     @gen_test
     def test_upload_allowed_methods(self):
-        response = yield self.http_client.fetch(self.get_url('/api/v1/upload'), method='OPTIONS')
+        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/upload'), method='OPTIONS')
         self.assertEqual(response.headers['Allow'], 'GET, POST, HEAD, OPTIONS')
 
     @gen_test
     def test_upload_post(self):
         request_context = self.prepare_request_context(100, 'payload.tar.gz')
         response = yield self.http_client.fetch(
-            self.get_url('/api/v1/upload'),
+            self.get_url('/r/insights/platform/upload/api/v1/upload'),
             method='POST',
             body=request_context.body,
             headers=request_context.headers
@@ -165,7 +165,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
     @gen_test
     def test_version(self):
-        response = yield self.http_client.fetch(self.get_url('/api/v1/version'), method='GET')
+        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/version'), method='GET')
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body, b'{"version": "%s"}' % VERSION)
 
@@ -175,7 +175,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
-                self.get_url('/api/v1/upload'),
+                self.get_url('/r/insights/platform/upload/api/v1/upload'),
                 method='POST',
                 body=request_context.body,
                 headers=request_context.headers
@@ -195,7 +195,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
-                self.get_url('/api/v1/upload'),
+                self.get_url('/r/insights/platform/upload/api/v1/upload'),
                 method='POST',
                 body=request_context.body,
                 headers=request_context.headers
@@ -210,7 +210,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
-                self.get_url('/api/v1/upload'),
+                self.get_url('/r/insights/platform/upload/api/v1/upload'),
                 method='POST',
                 body=request_context.body,
                 headers=request_context.headers
