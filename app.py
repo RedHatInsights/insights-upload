@@ -40,7 +40,7 @@ storage_driver = os.getenv("STORAGE_DRIVER", "s3")
 storage = import_module("utils.storage.{}".format(storage_driver))
 
 # Upload content type must match this regex. Third field matches end service
-content_regex = r'^application/vnd\.redhat\.([a-z]+)\.([a-z]+)\+(tgz|zip)$'
+content_regex = r'^application/vnd\.redhat\.([a-z0-9-]+)\.([a-z0-9-]+)\+(tgz|zip)$'
 
 # set max length to 10.5 MB (one MB larger than peak)
 MAX_LENGTH = int(os.getenv('MAX_LENGTH', 11010048))
