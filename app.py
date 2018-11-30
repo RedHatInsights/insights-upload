@@ -470,10 +470,10 @@ class StatusHandler(tornado.web.RequestHandler):
 
 
 endpoints = [
-    (r"/", RootHandler),
-    (r"/api/v1/version", VersionHandler),
-    (r"/api/v1/upload", UploadHandler),
-    (r"/api/v1/status", StatusHandler),
+    (r"/r/insights/platform/upload", RootHandler),
+    (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
+    (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
+    (r"/r/insights/platform/upload/api/v1/status", StatusHandler),
 ]
 
 app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
