@@ -68,6 +68,44 @@ VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
+
+
+class MQClient(object):
+
+    def __init__(self, client, name):
+        self.client = client
+        self.name = name
+        self.connected = False
+
+    def __str__(self):
+        return f"MQClient {self.name} {self.client} {'connected' if self.connected else 'disconnected'}"
+
+    async def start(self):
+        while not self.connected:
+            try:
+                logger.info("Attempting to connect %s client.", self.name)
+                await self.client.start()
+                logger.info("%s client connected successfully.", self.name)
+                self.connected = True
+            except KafkaError:
+                logger.exception("Failed to connect %s client, retrying in %d seconds.", self.name, RETRY_INTERVAL)
+                await asyncio.sleep(RETRY_INTERVAL)
+
+    async def work(self, worker):
+        try:
+            await worker(self.client)
+        except KafkaError:
+            logger.exception("Encountered exception while working with %s client, reconnecting.", self.name)
+            self.connected = False
+
+    def run(self, worker):
+        async def _f():
+            while True:
+                await self.start()
+                await self.work(worker)
+        return _f
+
+
 mqc = AIOKafkaConsumer(
     VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
     group_id=MQ_GROUP_ID
@@ -76,6 +114,8 @@ mqp = AIOKafkaProducer(
     loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
     connections_max_idle_ms=None
 )
+CONSUMER = MQClient(mqc, "consumer")
+PRODUCER = MQClient(mqp, "producer")
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque([], 999)
@@ -101,84 +141,29 @@ def split_content(content):
     return service
 
 
-class MQStatus(object):
-    """Class used to track the status of the producer/consumer clients."""
-    mqc_connected = False
-    mqp_connected = False
+async def handle_validation(client):
+    data = await client.getmany()
+    for tp, msgs in data.items():
+        if tp.topic == VALIDATION_QUEUE:
+            await handle_file(msgs)
+    await asyncio.sleep(0.1)
 
 
-async def consumer():
-    """Consume indefinitely from the validation queue.
-    """
-    MQStatus.mqc_connected = False
-    while True:
-        # If not connected, attempt to connect...
-        if not MQStatus.mqc_connected:
-            try:
-                logger.info("Consume client not connected, attempting to connect...")
-                await mqc.start()
-                logger.info("Consumer client connected!")
-                MQStatus.mqc_connected = True
-            except KafkaError:
-                logger.exception('Consume client hit error, triggering re-connect...')
-                await asyncio.sleep(RETRY_INTERVAL)
-                continue
-
-        # Consume
-        try:
-            data = await mqc.getmany()
-            for tp, msgs in data.items():
-                if tp.topic == VALIDATION_QUEUE:
-                    await handle_file(msgs)
-        except KafkaError:
-            logger.exception('Consume client hit error, triggering re-connect...')
-            MQStatus.mqc_connected = False
+async def send_to_preprocessors(client):
+    if not produce_queue:
         await asyncio.sleep(0.1)
-
-
-async def producer():
-    """Produce items sitting in our local produce_queue to kafka
-
-    An item is a dict with keys 'topic' and 'msg', which contain:
-        topic {str} -- The service name to notify
-        msg {dict} -- JSON containing a rh_account, principal, payload_id,
-                        and url for download
-    """
-    MQStatus.mqp_connected = False
-    while True:
-        # If not connected to kafka, attempt to connect...
-        if not MQStatus.mqp_connected:
-            try:
-                logger.info("Producer client not connected, attempting to connect...")
-                await mqp.start()
-                logger.info("Producer client connected!")
-                MQStatus.mqp_connected = True
-            except KafkaError:
-                logger.exception('Producer client hit error, triggering re-connect...')
-                await asyncio.sleep(RETRY_INTERVAL)
-                continue
-
-        # Pull items off our queue to produce
-        if not produce_queue:
-            await asyncio.sleep(0.1)
-            continue
-
-        for _ in range(0, len(produce_queue)):
-            item = produce_queue.popleft()
-            topic = item['topic']
-            msg = item['msg']
-            logger.info(
-                "Popped item from produce queue (qsize: %d): topic %s: %s",
-                len(produce_queue), topic, msg
-            )
-            try:
-                await mqp.send_and_wait(topic, json.dumps(msg).encode('utf-8'))
-                logger.info("Produced on topic %s: %s", topic, msg)
-            except KafkaError:
-                logger.exception('Producer client hit error, triggering re-connect...')
-                MQStatus.mqp_connected = False
-                # Put the item back on the queue so we can push it when we reconnect
-                produce_queue.appendleft(item)
+    else:
+        item = produce_queue.popleft()
+        topic, msg = item["topic"], item["msg"]
+        logger.info(
+            "Popped item from produce queue (qsize: %d): topic %s: %s",
+            len(produce_queue), topic, msg
+        )
+        try:
+            await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
+        except KafkaError:
+            produce_queue.appendleft(item)
+            raise
 
 
 async def handle_file(msgs):
@@ -444,36 +429,10 @@ class VersionHandler(tornado.web.RequestHandler):
         self.write(response)
 
 
-class StatusHandler(tornado.web.RequestHandler):
-
-    async def get(self):
-
-        response = {"upload_service": "up",
-                    "message_queue_producer": "down",
-                    "message_queue_consumer": "down",
-                    "long_term_storage": "down",
-                    "quarantine_storage": "down",
-                    "rejected_storage": "down"}
-
-        if storage.up_check(storage.PERM):
-            response['long_term_storage'] = "up"
-        if storage.up_check(storage.QUARANTINE):
-            response['quarantine_storage'] = "up"
-        if storage.up_check(storage.REJECT):
-            response['rejected_storage'] = "up"
-        if MQStatus.mqp_connected:
-            response['message_queue_producer'] = "up"
-        if MQStatus.mqc_connected:
-            response['message_queue_consumer'] = "up"
-
-        self.write(response)
-
-
 endpoints = [
     (r"/r/insights/platform/upload", RootHandler),
     (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
     (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
-    (r"/r/insights/platform/upload/api/v1/status", StatusHandler),
 ]
 
 app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
@@ -485,8 +444,8 @@ def main():
     logger.info(f"Web server listening on port {LISTEN_PORT}")
     loop = IOLoop.current()
     loop.set_default_executor(thread_pool_executor)
-    loop.spawn_callback(consumer)
-    loop.spawn_callback(producer)
+    loop.spawn_callback(CONSUMER.run(handle_validation))
+    loop.spawn_callback(PRODUCER.run(send_to_preprocessors))
     try:
         loop.start()
     except KeyboardInterrupt:

@@ -3,8 +3,6 @@ import io
 import json
 import os
 
-import boto3
-import moto
 import pytest
 import requests
 from botocore.exceptions import ClientError
@@ -59,60 +57,6 @@ class TestContentRegex(TestCase):
         for mime_type in mime_types:
             with self.subTest(mime_type=mime_type):
                 self.assertIsNone(search(app.content_regex, mime_type))
-
-
-class TestStatusHandler(AsyncHTTPTestCase):
-    def get_app(self):
-        return app.app
-
-    @gen_test
-    def test_check_everything_up(self):
-        with FakeMQ():
-            with moto.mock_s3():
-                s3_storage.s3 = boto3.client('s3')
-                s3_storage.s3.create_bucket(Bucket=s3_storage.QUARANTINE)
-                s3_storage.s3.create_bucket(Bucket=s3_storage.PERM)
-                s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
-
-                self.io_loop.spawn_callback(app.producer)
-                self.io_loop.spawn_callback(app.consumer)
-
-                response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/status'), method='GET')
-
-                body = json.loads(response.body)
-
-                self.assertDictEqual(
-                    body,
-                    {
-                        "upload_service": "up",
-                        "message_queue_consumer": "up",
-                        "message_queue_producer": "up",
-                        "long_term_storage": "up",
-                        "quarantine_storage": "up",
-                        "rejected_storage": "up"
-                    }
-                )
-
-    @gen_test
-    def test_check_everything_down(self):
-        with FakeMQ(is_down=True):
-            with moto.mock_s3():
-                s3_storage.s3 = boto3.client('s3')
-                response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/status'), method='GET')
-
-                body = json.loads(response.body)
-
-                self.assertDictEqual(
-                    body,
-                    {
-                        "upload_service": "up",
-                        "message_queue_producer": "down",
-                        "message_queue_consumer": "down",
-                        "long_term_storage": "down",
-                        "quarantine_storage": "down",
-                        "rejected_storage": "down"
-                    }
-                )
 
 
 class TestUploadHandler(AsyncHTTPTestCase):
@@ -238,11 +182,12 @@ class TestProducerAndConsumer:
         total_messages = 4
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
-        with FakeMQ():
+        with FakeMQ() as mq:
+            producer = app.MQClient(mq, "producer").run(app.send_to_preprocessors)
             assert app.mqp.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
-            event_loop.run_until_complete(self.coroutine_test(app.producer))
+            event_loop.run_until_complete(self.coroutine_test(producer))
 
             assert app.mqp.produce_calls_count == total_messages
             assert len(app.produce_queue) == 0
@@ -254,7 +199,9 @@ class TestProducerAndConsumer:
         total_messages = 4
         topic = 'platform.upload.validation'
         produced_messages = []
-        with FakeMQ():
+        with FakeMQ() as mq:
+            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
+
             for _ in range(total_messages):
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
@@ -270,7 +217,7 @@ class TestProducerAndConsumer:
             assert len(app.produce_queue) == 0
             assert app.mqc.consume_calls_count == 0
 
-            event_loop.run_until_complete(self.coroutine_test(app.consumer))
+            event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
                 with pytest.raises(ClientError) as e:
@@ -294,7 +241,8 @@ class TestProducerAndConsumer:
         s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
         produced_messages = []
 
-        with FakeMQ():
+        with FakeMQ() as mq:
+            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
             for _ in range(total_messages):
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='failure'
@@ -307,7 +255,7 @@ class TestProducerAndConsumer:
             assert len(app.produce_queue) == 0
             assert app.mqc.consume_calls_count == 0
 
-            event_loop.run_until_complete(self.coroutine_test(app.consumer))
+            event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
                 with pytest.raises(ClientError) as e:
@@ -331,7 +279,8 @@ class TestProducerAndConsumer:
         s3_storage.s3.create_bucket(Bucket=s3_storage.REJECT)
         produced_messages = []
 
-        with FakeMQ():
+        with FakeMQ() as mq:
+            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
             for _ in range(total_messages):
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='unknown'
@@ -344,7 +293,7 @@ class TestProducerAndConsumer:
             assert len(app.produce_queue) == 0
             assert app.mqc.consume_calls_count == 0
 
-            event_loop.run_until_complete(self.coroutine_test(app.consumer))
+            event_loop.run_until_complete(self.coroutine_test(consumer))
 
             assert app.mqc.consume_calls_count > 0
             assert app.mqc.consume_return_messages_count == 1
@@ -360,11 +309,12 @@ class TestProducerAndConsumer:
         total_messages = 4
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
-        with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2):
+        with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2) as mq:
+            producer = app.MQClient(mq, "producer").run(app.send_to_preprocessors)
             assert app.mqp.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
-            event_loop.run_until_complete(self.coroutine_test(app.producer))
+            event_loop.run_until_complete(self.coroutine_test(producer))
 
             assert app.mqp.produce_calls_count == total_messages
             assert len(app.produce_queue) == 0
@@ -377,7 +327,8 @@ class TestProducerAndConsumer:
         total_messages = 4
         topic = 'platform.upload.validation'
 
-        with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2):
+        with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2) as mq:
+            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
             for _ in range(total_messages):
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
@@ -389,7 +340,7 @@ class TestProducerAndConsumer:
             assert len(app.produce_queue) == 0
             assert app.mqc.consume_calls_count == 0
 
-            event_loop.run_until_complete(self.coroutine_test(app.consumer))
+            event_loop.run_until_complete(self.coroutine_test(consumer))
 
             assert app.mqc.consume_calls_count > 0
             assert app.mqc.consume_return_messages_count == 1
