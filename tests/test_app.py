@@ -10,6 +10,9 @@ import requests
 from botocore.exceptions import ClientError
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
+from unittest import TestCase
+from re import search
+
 
 import app
 from tests.fixtures.fake_mq import FakeMQ
@@ -20,6 +23,42 @@ from mock import patch
 client = AsyncHTTPClient()
 with open('VERSION', 'rb') as f:
     VERSION = f.read()
+
+
+class TestContentRegex(TestCase):
+    """
+    Test the content MIME type regex described in IPP 1.
+    """
+
+    def test_valid_mime_type(self):
+        """
+        A valid MIME type is correctly recognized.
+        """
+        mime_types = [
+            'application/vnd.redhat.insights.advisor+zip',
+            'application/vnd.redhat.insights.compliance+tgz',
+            'application/vnd.redhat.my-app.service1+zip',
+            'application/vnd.redhat.s0m3-s3rv1c3.s0m3-4pp+tgz'
+        ]
+        for mime_type in mime_types:
+            with self.subTest(mime_type=mime_type):
+                self.assertIsNotNone(search(app.content_regex, mime_type))
+
+    def test_invalid_mime_type(self):
+        """
+        An invalid MIME type is correctly recognized.
+        """
+        mime_types = [
+            'application/vnd.redhat.insights.advisor+tbz2',
+            'application/vnd.redhat.compliance+tgz',
+            'application/vnd.redhat.my_app.service+zip',
+            'text/vnd.redhat.insights.advisor+tgz',
+            'application/bbq.redhat.insights.advisor+tgz',
+            'application/vnd.ibm.insights.advisor+tgz'
+        ]
+        for mime_type in mime_types:
+            with self.subTest(mime_type=mime_type):
+                self.assertIsNone(search(app.content_regex, mime_type))
 
 
 class TestStatusHandler(AsyncHTTPTestCase):
