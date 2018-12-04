@@ -4,7 +4,6 @@ import uuid
 from mock import patch
 from random import randint
 from string import ascii_letters, digits
-from time import time
 
 import pytest
 import responses
@@ -12,7 +11,6 @@ from botocore.exceptions import ClientError
 
 from utils import mnm
 from utils.storage import localdisk as local_storage, s3 as s3_storage
-from utils.storage.s3 import UploadProgress
 
 
 class TestS3(object):
@@ -29,26 +27,20 @@ class TestS3(object):
     def test_write(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 
-        write_response = s3_storage.write(
+        url = s3_storage.write(
             local_file,
             s3_storage.QUARANTINE,
             key_name
         )
 
-        assert write_response is not None
-        assert isinstance(write_response, tuple)
-        assert len(write_response) == 2
-
-        url_path, s3_file_object = write_response
-
-        assert isinstance(url_path, str)
-        assert isinstance(s3_file_object, UploadProgress)
-        assert s3_storage.QUARANTINE in url_path
+        assert url is not None
+        assert isinstance(url, str)
+        assert s3_storage.QUARANTINE in url
 
     def test_copy(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 
-        write_file_path, s3_file_object = s3_storage.write(
+        write_file_path = s3_storage.write(
             local_file,
             s3_storage.QUARANTINE,
             key_name
@@ -70,7 +62,7 @@ class TestS3(object):
 
     def test_ls(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
-        file_url, _ = s3_storage.write(
+        file_url = s3_storage.write(
             local_file,
             s3_storage.QUARANTINE,
             key_name
@@ -108,7 +100,7 @@ class TestLocalDisk(object):
         self.non_existing_folder = 'some-random-folder'
 
     def test_write(self, with_local_folders):
-        file_name, _ = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
@@ -118,34 +110,19 @@ class TestLocalDisk(object):
             local_storage.write(self._get_file_data(), self.non_existing_folder, self.temp_file_name)
 
     def test_write_no_folders_at_all(self, no_local_folders):
-        file_name, _ = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
 
-    @patch("utils.storage.localdisk.DummyCallback")
     @patch("utils.storage.localdisk.open")
     @patch("utils.storage.localdisk.os.path.isdir", return_value=True)
-    def test_write_return(self, isdir, open_mock, dummy_callback):
+    def test_write_return(self, isdir, open_mock):
         """
-        Write method returns a file name and a dummy callback instance.
+        Write method returns a file name
         """
         result = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
-        assert result == (open_mock.return_value.__enter__.return_value.name,
-                          dummy_callback.return_value)
-
-    @patch("utils.storage.localdisk.open")
-    @patch("utils.storage.localdisk.os.path.isdir", return_value=True)
-    def test_write_callback(self, isdir, open_mock):
-        """
-        Dummy callback claims it has immediately done uploading.
-        """
-        url, callback = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
-
-        now = time()
-        assert callback.percentage == 100
-        assert callback.time_last_updated < now
-        assert callback.time_last_updated == pytest.approx(now, abs=2)
+        assert result == open_mock.return_value.__enter__.return_value.name
 
     def test_ls(self, with_local_folders):
         local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
@@ -162,7 +139,7 @@ class TestLocalDisk(object):
             assert os.path.isdir(_dir) is True
 
     def test_copy(self, with_local_folders):
-        original_file_path, _ = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        original_file_path = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
 
         original_file = open(original_file_path, 'rb')
         original_checksum = hashlib.md5(original_file.read()).hexdigest()

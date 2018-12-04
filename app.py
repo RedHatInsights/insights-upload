@@ -162,7 +162,7 @@ async def send_to_preprocessors(client):
         try:
             await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
         except KafkaError:
-            produce_queue.appendleft(item)
+            produce_queue.append(item)
             raise
 
 
@@ -263,44 +263,31 @@ class UploadHandler(tornado.web.RequestHandler):
             str -- URL of uploaded file if successful
             None if upload failed
         """
+
+        upload_start = time()
         logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id)
 
-        success = False
-        upload_start = time()
-
         try:
-            url, callback = await IOLoop.current().run_in_executor(
+            url = await IOLoop.current().run_in_executor(
                 None, storage.write, filename, storage.QUARANTINE, payload_id
             )
+            elapsed = time() - upload_start
+
+            logger.info(
+                "tracking id [%s] payload_id [%s] uploaded! elapsed [%fsec] url [%s]",
+                tracking_id, payload_id, elapsed, url
+            )
+
+            return url
         except Exception:
+            elapsed = time() - upload_start
             logger.exception(
-                "Exception hit uploading: tracking id [%s] payload_id [%s]",
-                tracking_id, payload_id
+                "Exception hit uploading: tracking id [%s] payload_id [%s] elapsed [%fsec]",
+                tracking_id, payload_id, elapsed
             )
-        else:
-            for count in range(0, STORAGE_UPLOAD_TIMEOUT * 10):
-                if callback.percentage >= 100:
-                    success = True
-                    break
-                await asyncio.sleep(.01)  # to avoid baking CPU while looping
+        finally:
+            await IOLoop.current().run_in_executor(None, os.remove, filename)
 
-        await IOLoop.current().run_in_executor(None, os.remove, filename)
-
-        if not success:
-            # Upload failed, return None
-            logger.error(
-                "upload id: %s upload failed or timed out after %dsec!",
-                payload_id, STORAGE_UPLOAD_TIMEOUT
-            )
-            return None
-
-        elapsed = callback.time_last_updated - upload_start
-        logger.info(
-            "tracking id [%s] payload_id [%s] uploaded! elapsed [%fsec] url [%s]",
-            tracking_id, payload_id, elapsed, url
-        )
-
-        return url
 
     async def process_upload(self, filename, size, tracking_id, payload_id, identity, service):
         """Process the uploaded file we have received.

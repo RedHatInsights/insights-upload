@@ -141,7 +141,7 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
     def set_url(_file, service, avoid_produce_queue=False, validation='success'):
         file_name = uuid.uuid4().hex
 
-        file_path, _ = s3_storage.write(
+        file_path = s3_storage.write(
             _file,
             s3_storage.QUARANTINE,
             file_name
