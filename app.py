@@ -146,24 +146,27 @@ async def handle_validation(client):
     for tp, msgs in data.items():
         if tp.topic == VALIDATION_QUEUE:
             await handle_file(msgs)
-    await asyncio.sleep(0.1)
 
 
-async def send_to_preprocessors(client):
-    if not produce_queue:
-        await asyncio.sleep(0.1)
-    else:
-        item = produce_queue.popleft()
-        topic, msg = item["topic"], item["msg"]
-        logger.info(
-            "Popped item from produce queue (qsize: %d): topic %s: %s",
-            len(produce_queue), topic, msg
-        )
-        try:
-            await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
-        except KafkaError:
-            produce_queue.append(item)
-            raise
+def make_preprocessor(queue=None):
+    queue = produce_queue if queue is None else queue
+
+    async def send_to_preprocessors(client):
+        if not produce_queue:
+            await asyncio.sleep(0.1)
+        else:
+            item = produce_queue.popleft()
+            topic, msg = item["topic"], item["msg"]
+            logger.info(
+                "Popped item from produce queue (qsize: %d): topic %s: %s",
+                len(produce_queue), topic, msg
+            )
+            try:
+                await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
+            except KafkaError:
+                produce_queue.append(item)
+                raise
+    return send_to_preprocessors
 
 
 async def handle_file(msgs):
@@ -287,7 +290,6 @@ class UploadHandler(tornado.web.RequestHandler):
             )
         finally:
             await IOLoop.current().run_in_executor(None, os.remove, filename)
-
 
     async def process_upload(self, filename, size, tracking_id, payload_id, identity, service):
         """Process the uploaded file we have received.
@@ -432,7 +434,7 @@ def main():
     loop = IOLoop.current()
     loop.set_default_executor(thread_pool_executor)
     loop.spawn_callback(CONSUMER.run(handle_validation))
-    loop.spawn_callback(PRODUCER.run(send_to_preprocessors))
+    loop.spawn_callback(PRODUCER.run(make_preprocessor(produce_queue)))
     try:
         loop.start()
     except KeyboardInterrupt:

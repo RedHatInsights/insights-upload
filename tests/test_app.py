@@ -183,7 +183,7 @@ class TestProducerAndConsumer:
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
         with FakeMQ() as mq:
-            producer = app.MQClient(mq, "producer").run(app.send_to_preprocessors)
+            producer = app.MQClient(mq, "producer").run(app.make_preprocessor())
             assert app.mqp.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
@@ -310,7 +310,7 @@ class TestProducerAndConsumer:
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
         with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2) as mq:
-            producer = app.MQClient(mq, "producer").run(app.send_to_preprocessors)
+            producer = app.MQClient(mq, "producer").run(app.make_preprocessor())
             assert app.mqp.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
