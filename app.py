@@ -152,19 +152,19 @@ def make_preprocessor(queue=None):
     queue = produce_queue if queue is None else queue
 
     async def send_to_preprocessors(client):
-        if not produce_queue:
+        if not queue:
             await asyncio.sleep(0.1)
         else:
-            item = produce_queue.popleft()
+            item = queue.popleft()
             topic, msg = item["topic"], item["msg"]
             logger.info(
                 "Popped item from produce queue (qsize: %d): topic %s: %s",
-                len(produce_queue), topic, msg
+                len(queue), topic, msg
             )
             try:
                 await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
             except KafkaError:
-                produce_queue.append(item)
+                queue.append(item)
                 raise
     return send_to_preprocessors
 
