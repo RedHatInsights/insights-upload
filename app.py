@@ -15,6 +15,7 @@ from time import sleep, time
 import tornado.ioloop
 import tornado.web
 from tornado.ioloop import IOLoop
+from tornado.httputil import parse_body_arguments
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
@@ -129,7 +130,7 @@ with open('VERSION', 'r') as f:
 
 
 def split_content(content):
-    """Split the content-type to find the service name
+    """Split the content_type to find the service name
 
     Arguments:
         content {str} -- content-type of the payload
@@ -242,7 +243,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
             error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + str(MAX_LENGTH) + ' bytes')
             return error
-        if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
+        if re.search(content_regex, self.files['upload'][0]['content_type']) is None:
             error = (415, 'Unsupported Media Type')
             return error
 
@@ -359,8 +360,13 @@ class UploadHandler(tornado.web.RequestHandler):
         then offload for async processing
         """
         identity = None
+        self.files = {}
+        self.arguments = {}
+        tornado.httputil.parse_body_arguments(
+            self.request.headers["Content-Type"], self.request.body, self.arguments, self.files
+        )
 
-        if not self.request.files.get('upload'):
+        if not self.files.get('upload'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
             return
@@ -382,13 +388,15 @@ class UploadHandler(tornado.web.RequestHandler):
             return
         else:
             tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
-            service = split_content(self.request.files['upload'][0]['content_type'])
+            metadata = self.arguments.get('metadata')[0].decode('utf-8') if self.arguments.get('metadata') else None
+            logger.info("metadata: %s", metadata)
+            service = split_content(self.files['upload'][0]['content_type'])
             if self.request.headers.get('x-rh-identity'):
                 logger.info('x-rh-identity: %s', base64.b64decode(self.request.headers['x-rh-identity']))
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 identity = header['identity']
             size = int(self.request.headers['Content-Length'])
-            body = self.request.files['upload'][0]['body']
+            body = self.files['upload'][0]['body']
 
             filename = await IOLoop.current().run_in_executor(None, self.write_data, body)
 

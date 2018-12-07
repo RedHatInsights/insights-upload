@@ -61,11 +61,12 @@ class TestPost(AsyncHTTPTestCase):
     @patch("app.UploadHandler.upload_validation", return_value=False)
     @gen_test
     def test_indentity_default_value(self, upload_validation, write_data, process_upload):
+        body = b'--------------------------78e1ac87dc43899d\r\nContent-Disposition: form-data; name="upload"; filename="some_file.tgz"\r\nContent-Type: application/vnd.redhat.testareno.something+tgz\r\n\r\nsomerandomedata\r\n--------------------------78e1ac87dc43899d--\r\n'
         size = 123
-        request = Mock(**{"files": {"upload": [{"content_type": "application/vnd.redhat.testareno.something+tgz",
-                                                "body": ""}]},
-                                    "headers": {"Content-Length": size,
-                                                "x-rh-insights-request-id": "test"}})
+        request = Mock(**{"body": body,
+                          "headers": {"Content-Length": size,
+                                      "x-rh-insights-request-id": "test",
+                                      "Content-Type": "multipart/form-data; boundary=------------------------78e1ac87dc43899d"}})
         handler = UploadHandler(app, request)
 
         yield handler.post()
