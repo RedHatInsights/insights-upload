@@ -8,7 +8,7 @@ from tornado.testing import AsyncHTTPTestCase, gen_test
 localdisk = import_module("utils.storage.localdisk")
 
 
-async def process_upload(filename, size, tracking_id, payload_id, identity, service):
+async def process_upload():
     """
     A dummy method to path the real process_upload method. It must be asynchronous, but (Magic)Mock doesn’t support
     that.
@@ -71,4 +71,4 @@ class TestPost(AsyncHTTPTestCase):
 
         yield handler.post()
 
-        process_upload.assert_called_once_with(Anything(), Anything(), Anything(), Anything(), None, Anything())
+        process_upload.assert_called_once_with()

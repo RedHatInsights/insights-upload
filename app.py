@@ -292,7 +292,7 @@ class UploadHandler(tornado.web.RequestHandler):
         finally:
             await IOLoop.current().run_in_executor(None, os.remove, filename)
 
-    async def process_upload(self, filename, size, tracking_id, payload_id, identity, service):
+    async def process_upload(self):
         """Process the uploaded file we have received.
 
         Arguments:
@@ -308,29 +308,29 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         values = {}
         # use dummy values for now if no account given
-        logger.info('identity - %s', identity)
-        if identity:
-            values['rh_account'] = identity['account_number']
-            values['principal'] = identity['org_id']
+        logger.info('identity - %s', self.identity)
+        if self.identity:
+            values['rh_account'] = self.identity['account_number']
+            values['principal'] = self.identity['org_id']
         else:
             values['rh_account'] = DUMMY_VALUES['rh_account']
             values['principal'] = DUMMY_VALUES['principal']
-        values['validation'] = 1
-        values['payload_id'] = payload_id
-        values['hash'] = payload_id  # provided for backward compatibility
-        values['size'] = size
-        values['service'] = service
-        values['metadata'] = json.loads(self.metadata)
+        values['payload_id'] = self.payload_id
+        values['hash'] = self.payload_id  # provided for backward compatibility
+        values['size'] = self.size
+        values['service'] = self.service
+        if self.metadata:
+            values['metadata'] = json.loads(self.metadata)
 
-        url = await self.upload(filename, tracking_id, payload_id)
+        url = await self.upload(self.filename, self.tracking_id, self.payload_id)
 
         if url:
             values['url'] = url
 
-            produce_queue.append({'topic': 'platform.upload.' + service, 'msg': values})
+            produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] put on produce queue (qsize: %d)",
-                payload_id, len(produce_queue)
+                self.payload_id, len(produce_queue)
             )
 
             # TODO: send a metric to influx for a failed upload too?
@@ -360,7 +360,7 @@ class UploadHandler(tornado.web.RequestHandler):
         Validate upload, get service name, create UUID, save to local storage,
         then offload for async processing
         """
-        identity = None
+        self.identity = None
         self.files = {}
         self.arguments = {}
         parse_body_arguments(
@@ -372,9 +372,9 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(415, "Upload field not found")
             return
 
-        payload_id = self.request.headers.get('x-rh-insights-request-id')
+        self.payload_id = self.request.headers.get('x-rh-insights-request-id')
 
-        if payload_id is None:
+        if self.payload_id is None:
             msg = "No payload_id assigned. Upload Failed"
             logger.error(msg)
             self.set_header("Content-Type", "text/plain")
@@ -388,24 +388,24 @@ class UploadHandler(tornado.web.RequestHandler):
             self.set_status(invalid[0], invalid[1])
             return
         else:
-            tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
+            self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             self.metadata = self.arguments.get('metadata')[0].decode('utf-8') if self.arguments.get('metadata') else None
-            service = split_content(self.files['upload'][0]['content_type'])
+            self.service = split_content(self.files['upload'][0]['content_type'])
             if self.request.headers.get('x-rh-identity'):
                 logger.info('x-rh-identity: %s', base64.b64decode(self.request.headers['x-rh-identity']))
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
-                identity = header['identity']
-            size = int(self.request.headers['Content-Length'])
+                self.identity = header['identity']
+            self.size = int(self.request.headers['Content-Length'])
             body = self.files['upload'][0]['body']
 
-            filename = await IOLoop.current().run_in_executor(None, self.write_data, body)
+            self.filename = await IOLoop.current().run_in_executor(None, self.write_data, body)
 
             response = {'status': (202, 'Accepted')}
             self.set_status(response['status'][0], response['status'][1])
 
             # Offload the handling of the upload and producing to kafka
             asyncio.ensure_future(
-                self.process_upload(filename, size, tracking_id, payload_id, identity, service)
+                self.process_upload()
             )
             return
 
