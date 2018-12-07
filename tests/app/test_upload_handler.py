@@ -43,7 +43,7 @@ class TestUpload(AsyncHTTPTestCase):
         request = Mock()
         handler = UploadHandler(app, request)
 
-        yield handler.upload("some filename", "some tracking id", "some payload_id")
+        yield handler.upload()
 
         logger.exception.assert_not_called()
 
