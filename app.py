@@ -15,7 +15,6 @@ from time import sleep, time
 import tornado.ioloop
 import tornado.web
 from tornado.ioloop import IOLoop
-from tornado.httputil import parse_body_arguments
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
