@@ -243,7 +243,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
             error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + str(MAX_LENGTH) + ' bytes')
             return error
-        if re.search(content_regex, self.files['upload'][0]['content_type']) is None:
+        if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
             error = (415, 'Unsupported Media Type')
             return error
 
@@ -361,13 +361,8 @@ class UploadHandler(tornado.web.RequestHandler):
         then offload for async processing
         """
         self.identity = None
-        self.files = {}
-        self.arguments = {}
-        parse_body_arguments(
-            self.request.headers["Content-Type"], self.request.body, self.arguments, self.files
-        )
 
-        if not self.files.get('upload'):
+        if not self.request.files.get('upload'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
             return
@@ -389,14 +384,14 @@ class UploadHandler(tornado.web.RequestHandler):
             return
         else:
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
-            self.metadata = self.arguments.get('metadata')[0].decode('utf-8') if self.arguments.get('metadata') else None
-            self.service = split_content(self.files['upload'][0]['content_type'])
+            self.metadata = self.request.body_arguments['metadata'][0].decode('utf-8')
+            self.service = split_content(self.request.files['upload'][0]['content_type'])
             if self.request.headers.get('x-rh-identity'):
                 logger.info('x-rh-identity: %s', base64.b64decode(self.request.headers['x-rh-identity']))
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 self.identity = header['identity']
             self.size = int(self.request.headers['Content-Length'])
-            body = self.files['upload'][0]['body']
+            body = self.request.files['upload'][0]['body']
 
             self.filename = await IOLoop.current().run_in_executor(None, self.write_data, body)
 
