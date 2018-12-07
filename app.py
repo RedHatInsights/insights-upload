@@ -363,7 +363,7 @@ class UploadHandler(tornado.web.RequestHandler):
         identity = None
         self.files = {}
         self.arguments = {}
-        tornado.httputil.parse_body_arguments(
+        parse_body_arguments(
             self.request.headers["Content-Type"], self.request.body, self.arguments, self.files
         )
 
