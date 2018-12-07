@@ -251,7 +251,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
-    async def upload(self, filename, tracking_id, payload_id):
+    async def upload(self):
         """Write the payload to the configured storage
 
         Storage write and os file operations are not async so we offload to executor.
@@ -268,17 +268,17 @@ class UploadHandler(tornado.web.RequestHandler):
         """
 
         upload_start = time()
-        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id)
+        logger.info("tracking id [%s] payload_id [%s] attempting upload", self.tracking_id, self.payload_id)
 
         try:
             url = await IOLoop.current().run_in_executor(
-                None, storage.write, filename, storage.QUARANTINE, payload_id
+                None, storage.write, self.filename, storage.QUARANTINE, self.payload_id
             )
             elapsed = time() - upload_start
 
             logger.info(
                 "tracking id [%s] payload_id [%s] uploaded! elapsed [%fsec] url [%s]",
-                tracking_id, payload_id, elapsed, url
+                self.tracking_id, self.payload_id, elapsed, url
             )
 
             return url
@@ -286,10 +286,10 @@ class UploadHandler(tornado.web.RequestHandler):
             elapsed = time() - upload_start
             logger.exception(
                 "Exception hit uploading: tracking id [%s] payload_id [%s] elapsed [%fsec]",
-                tracking_id, payload_id, elapsed
+                self.tracking_id, self.payload_id, elapsed
             )
         finally:
-            await IOLoop.current().run_in_executor(None, os.remove, filename)
+            await IOLoop.current().run_in_executor(None, os.remove, self.filename)
 
     async def process_upload(self):
         """Process the uploaded file we have received.
@@ -321,7 +321,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if self.metadata:
             values['metadata'] = json.loads(self.metadata)
 
-        url = await self.upload(self.filename, self.tracking_id, self.payload_id)
+        url = await self.upload()
 
         if url:
             values['url'] = url
