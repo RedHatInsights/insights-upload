@@ -211,6 +211,16 @@ async def handle_file(msgs):
                                 }
                     }
                 )
+                # TODO: Remove this once advisor stops listening to their queue
+                if data.get('service') == 'advisor':
+                    produce_queue.append(
+                        {
+                            'topic': 'platform.upload.advisor',
+                            'msg': {'url': url,
+                                    'payload_id': payload_id
+                                    }
+                        }
+                    )
             elif result.lower() == 'failure':
                 logger.info('%s rejected', payload_id)
                 url = await IOLoop.current().run_in_executor(
