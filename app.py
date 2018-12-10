@@ -70,8 +70,6 @@ MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 
 
-
-
 class MQClient(object):
 
     def __init__(self, client, name):
@@ -435,6 +433,7 @@ class MetricsHandler(tornado.web.RequestHandler):
 
     def get(self):
         self.write(mnm.generate_latest())
+
 
 endpoints = [
     (r"/r/insights/platform/upload", RootHandler),

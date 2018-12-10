@@ -3,7 +3,7 @@ import os
 
 import requests
 
-from prometheus_client import Counter, generate_latest
+from prometheus_client import Counter, generate_latest # noqa
 
 INFLUXDB_PLATFORM = os.getenv('INFLUX_URL', 'http://influxdb.mnm.svc.cluster.local:8086/write?db=platform')
 INFLUX_USER = os.getenv('INFLUX_USER')
@@ -20,6 +20,7 @@ uploads_invalid = Counter('uploads_invalid', 'Thte total number of invalid uploa
 uploads_invalidated = Counter('uploads_validated_failure', 'The total amount of uploads invalidated by services')
 uploads_too_large = Counter('uploads_too_large', 'The total amount of uploads great than max_length')
 uploads_unsupported_filetype = Counter('uploads_unsupported_filetype', 'The total amount of uploads not matching mimetype regex')
+
 
 logger = logging.getLogger(__name__)
 
