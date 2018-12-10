@@ -12,6 +12,7 @@ mock = "*"
 moto = "*"
 responses = "*"
 sh = "*"
+pytest-cov = "*"
 
 [packages]
 tornado = "*"

@@ -3,12 +3,24 @@ import os
 
 import requests
 
+from prometheus_client import Counter, generate_latest # noqa
+
 INFLUXDB_PLATFORM = os.getenv('INFLUX_URL', 'http://influxdb.mnm.svc.cluster.local:8086/write?db=platform')
 INFLUX_USER = os.getenv('INFLUX_USER')
 INFLUX_PASS = os.getenv('INFLUX_PASS')
 
 NAMESPACE = 'unknown'
 NAMESPACE_PATH = '/var/run/secrets/kubernetes.io/serviceaccount/namespace'
+
+# Prometheus Counters
+uploads_total = Counter('uploads_total', 'The total amount of uploads')
+uploads_valid = Counter('uploads_valid', 'The total amount of valid uploads')
+uploads_validated = Counter('uploads_validated_success', 'The total amount of successfully validated uploads')
+uploads_invalid = Counter('uploads_invalid', 'Thte total number of invalid uploads')
+uploads_invalidated = Counter('uploads_validated_failure', 'The total amount of uploads invalidated by services')
+uploads_too_large = Counter('uploads_too_large', 'The total amount of uploads great than max_length')
+uploads_unsupported_filetype = Counter('uploads_unsupported_filetype', 'The total amount of uploads not matching mimetype regex')
+
 
 logger = logging.getLogger(__name__)
 
