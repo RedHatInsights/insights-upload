@@ -70,6 +70,8 @@ MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 
 
+
+
 class MQClient(object):
 
     def __init__(self, client, name):
@@ -195,6 +197,7 @@ async def handle_file(msgs):
 
         logger.info('processing message: %s - %s', payload_id, result)
         if result.lower() == 'success':
+            mnm.uploads_validated.inc()
             url = await IOLoop.current().run_in_executor(
                 None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
             )
@@ -207,6 +210,7 @@ async def handle_file(msgs):
                 }
             )
         elif result.lower() == 'failure':
+            mnm.uploads_invalidated.inc()
             logger.info('%s rejected', payload_id)
             url = await IOLoop.current().run_in_executor(
                 None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
@@ -241,8 +245,10 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
             error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + str(MAX_LENGTH) + ' bytes')
+            mnm.uploads_too_large.inc()
             return error
         if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
+            mnm.uploads_unsupported_filetype.inc()
             error = (415, 'Unsupported Media Type')
             return error
 
@@ -359,6 +365,7 @@ class UploadHandler(tornado.web.RequestHandler):
         Validate upload, get service name, create UUID, save to local storage,
         then offload for async processing
         """
+        mnm.uploads_total.inc()
         self.identity = None
 
         if not self.request.files.get('upload'):
@@ -379,9 +386,11 @@ class UploadHandler(tornado.web.RequestHandler):
         invalid = self.upload_validation()
 
         if invalid:
+            mnm.uploads_invalid.inc()
             self.set_status(invalid[0], invalid[1])
             return
         else:
+            mnm.uploads_valid.inc()
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             self.metadata = self.request.body_arguments['metadata'][0].decode('utf-8') if self.request.body_arguments.get('metadata') else None
             self.service = split_content(self.request.files['upload'][0]['content_type'])
@@ -420,10 +429,18 @@ class VersionHandler(tornado.web.RequestHandler):
         self.write(response)
 
 
+class MetricsHandler(tornado.web.RequestHandler):
+    """Handle requests to the metrics
+    """
+
+    def get(self):
+        self.write(mnm.generate_latest())
+
 endpoints = [
     (r"/r/insights/platform/upload", RootHandler),
     (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
     (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
+    (r"/metrics", MetricsHandler)
 ]
 
 app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
