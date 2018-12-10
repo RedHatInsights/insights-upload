@@ -64,6 +64,7 @@ DUMMY_VALUES = {
 }
 
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
+PUP_QUEUE = os.getenv('PUP_QUEUE', 'platform.upload.advisor-pup')
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
@@ -194,27 +195,35 @@ async def handle_file(msgs):
         result = data['validation']
 
         logger.info('processing message: %s - %s', payload_id, result)
-        if result.lower() == 'success':
-            mnm.uploads_validated.inc()
-            url = await IOLoop.current().run_in_executor(
-                None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
-            )
-            logger.info(url)
-            produce_queue.append(
-                {
-                    'topic': 'platform.upload.available',
-                    'msg': {'url': url,
-                            'payload_id': payload_id}
-                }
-            )
-        elif result.lower() == 'failure':
-            mnm.uploads_invalidated.inc()
-            logger.info('%s rejected', payload_id)
-            url = await IOLoop.current().run_in_executor(
-                None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
-            )
+
+        if storage.ls(storage.QUARANTINE, payload_id)['ResponseMetadata']['HTTPStatusCode'] == 200:
+            if result.lower() == 'success':
+                mnm.uploads_validated.inc()
+
+                url = await IOLoop.current().run_in_executor(
+                    None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
+                )
+                logger.info(url)
+                produce_queue.append(
+                    {
+                        'topic': 'platform.upload.available',
+                        'msg': {'id': data.get('id'),
+                                'url': url,
+                                'service': data.get('service'),
+                                'payload_id': payload_id
+                                }
+                    }
+                )
+            elif result.lower() == 'failure':
+                mnm.uploads_invalidated.inc()
+                logger.info('%s rejected', payload_id)
+                url = await IOLoop.current().run_in_executor(
+                    None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
+                )
+            else:
+                logger.info('Unrecognized result: %s', result.lower())
         else:
-            logger.info('Unrecognized result: %s', result.lower())
+            logger.info('Payload ID no longer in quarantine: %s', payload_id)
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -322,6 +331,7 @@ class UploadHandler(tornado.web.RequestHandler):
         values['hash'] = self.payload_id  # provided for backward compatibility
         values['size'] = self.size
         values['service'] = self.service
+        values['b64_identity'] = self.b64_identity
         if self.metadata:
             values['metadata'] = json.loads(self.metadata)
 
@@ -330,7 +340,10 @@ class UploadHandler(tornado.web.RequestHandler):
         if url:
             values['url'] = url
 
-            produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
+            if self.service == 'advisor':
+                produce_queue.append({'topic': PUP_QUEUE, 'msg': values})
+            else:
+                produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] put on produce queue (qsize: %d)",
                 self.payload_id, len(produce_queue)
@@ -396,6 +409,7 @@ class UploadHandler(tornado.web.RequestHandler):
                 logger.info('x-rh-identity: %s', base64.b64decode(self.request.headers['x-rh-identity']))
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 self.identity = header['identity']
+                self.b64_identity = self.request.headers['x-rh-identity']
             self.size = int(self.request.headers['Content-Length'])
             body = self.request.files['upload'][0]['body']
 

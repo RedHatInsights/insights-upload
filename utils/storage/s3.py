@@ -36,8 +36,7 @@ def copy(src, dest, uuid):
 
 
 def ls(src, uuid):
-    head_object = s3.head_object(Bucket=src, Key=uuid)
-    return head_object
+    return s3.head_object(Bucket=src, Key=uuid)
 
 
 def up_check(name):
@@ -45,8 +44,7 @@ def up_check(name):
     try:
         s3.head_bucket(Bucket=name)
     except ClientError as e:
-        error_code = int(e.response['Error']['Code'])
-        if error_code == 404:
+        if int(e.response['Error']['Code']) == 404:
             exists = False
 
     return exists
