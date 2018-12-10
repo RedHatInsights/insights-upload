@@ -204,7 +204,9 @@ async def handle_file(msgs):
                 produce_queue.append(
                     {
                         'topic': 'platform.upload.available',
-                        'msg': {'url': url,
+                        'msg': {'id': data.get('id'),
+                                'url': url,
+                                'service': data.get('service'),
                                 'payload_id': payload_id
                                 }
                     }
