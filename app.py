@@ -195,25 +195,29 @@ async def handle_file(msgs):
         result = data['validation']
 
         logger.info('processing message: %s - %s', payload_id, result)
-        if result.lower() == 'success':
-            url = await IOLoop.current().run_in_executor(
-                None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
-            )
-            logger.info(url)
-            produce_queue.append(
-                {
-                    'topic': 'platform.upload.available',
-                    'msg': {'url': url,
-                            'payload_id': payload_id}
-                }
-            )
-        elif result.lower() == 'failure':
-            logger.info('%s rejected', payload_id)
-            url = await IOLoop.current().run_in_executor(
-                None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
-            )
+        if storage.ls(storage.QUARANTINE, payload_id)['ResponseMetadata']['HTTPStatusCode'] == 200:
+            if result.lower() == 'success':
+                url = await IOLoop.current().run_in_executor(
+                    None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
+                )
+                logger.info(url)
+                produce_queue.append(
+                    {
+                        'topic': 'platform.upload.available',
+                        'msg': {'url': url,
+                                'payload_id': payload_id
+                                }
+                    }
+                )
+            elif result.lower() == 'failure':
+                logger.info('%s rejected', payload_id)
+                url = await IOLoop.current().run_in_executor(
+                    None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
+                )
+            else:
+                logger.info('Unrecognized result: %s', result.lower())
         else:
-            logger.info('Unrecognized result: %s', result.lower())
+            logger.info('Payload ID no longer in quarantine: %s', payload_id)
 
 
 class RootHandler(tornado.web.RequestHandler):
