@@ -21,6 +21,7 @@ requests = "*"
 botocore = "*"
 aiokafka = "*"
 logstash_formatter = "*"
+prometheus-client = ">=0.5.0"
 
 [requires]
 python_version = "3.6"

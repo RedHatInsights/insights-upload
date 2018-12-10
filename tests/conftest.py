@@ -39,7 +39,8 @@ def local_file():
     except Exception:
         pass
 
-    sh.fallocate("-l", "100", file_path)
+    with open(file_path, "wb") as fp:
+        fp.write(b"0" * 100)
 
     yield file_path
 
