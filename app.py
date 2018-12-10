@@ -64,6 +64,7 @@ DUMMY_VALUES = {
 }
 
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
+PUP_QUEUE = os.getenv('PUP_QUEUE', 'platform.upload.advisor-pup')
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
@@ -326,7 +327,10 @@ class UploadHandler(tornado.web.RequestHandler):
         if url:
             values['url'] = url
 
-            produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
+            if self.service == 'advisor':
+                produce_queue.append({'topic': PUP_QUEUE, 'msg': values})
+            else:
+                produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] put on produce queue (qsize: %d)",
                 self.payload_id, len(produce_queue)
