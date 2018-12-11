@@ -14,6 +14,7 @@ from time import time
 
 import tornado.ioloop
 import tornado.web
+import tornado.httpclient
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
 
@@ -71,6 +72,8 @@ DUMMY_VALUES = {
 }
 
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
+
+INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
@@ -254,6 +257,16 @@ class UploadHandler(tornado.web.RequestHandler):
             logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
             return self.error(415, 'Unsupported Media Type')
 
+    async def post_to_inventory(self, values):
+        headers = {'x-rh-identity': self.b64_identity}
+        values['facts'] = [values['metadata']]
+        body = json.dumps(values)
+        try:
+            response = tornado.httpclient.HTTPRequest(INVENTORY_URL, method='POST', body=body, headers=headers)
+            logger.info("Posted to metadata to inventory. Payload ID [%s] - %s", self.payload_id, response.body)
+        except tornado.httpclient.HTTPClientError as e:
+            logger.error("Failed to post data to inventory. Payload ID [%s] - %s: %s", self.payload_id, e.code, e.response)
+
     def get(self):
         """Handles GET requests to the upload endpoint
         """
@@ -329,6 +342,7 @@ class UploadHandler(tornado.web.RequestHandler):
         values['b64_identity'] = self.b64_identity
         if self.metadata:
             values['metadata'] = json.loads(self.metadata)
+            await self.post_to_inventory(values)
 
         url = await self.upload(self.filename, self.tracking_id, self.payload_id)
 
