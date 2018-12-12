@@ -149,7 +149,7 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
         )
 
         values = {
-            'rh_account': app.DUMMY_VALUES['rh_account'],
+            'account': app.DUMMY_VALUES['account'],
             'principal': app.DUMMY_VALUES['principal'],
             'validation': validation,
             'payload_id': file_name,

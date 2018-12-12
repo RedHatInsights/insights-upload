@@ -53,10 +53,10 @@ MAX_WORKERS = int(os.getenv('MAX_WORKERS', 50))
 # Maximum time to wait for an archive to upload to storage
 STORAGE_UPLOAD_TIMEOUT = int(os.getenv('STORAGE_UPLOAD_TIMEOUT', 60))
 
-# these are dummy values since we can't yet get a principal or rh_account
+# dummy values for testing without a real identity
 DUMMY_VALUES = {
     'principal': 'default_principal',
-    'rh_account': '000001',
+    'account': '000001',
     'payload_id': '1234567890abcdef',
     'url': 'http://defaulttesturl',
     'validation': 0,
@@ -207,11 +207,16 @@ async def handle_file(msgs):
                 produce_queue.append(
                     {
                         'topic': 'platform.upload.available',
-                        'msg': {'id': data.get('id'),
-                                'url': url,
-                                'service': data.get('service'),
-                                'payload_id': payload_id
-                                }
+                        'msg': {
+                            'id': data.get('id'),
+                            'url': url,
+                            'service': data.get('service'),
+                            'payload_id': payload_id,
+                            'account': data.get('account'),
+                            'principal': data.get('principal'),
+                            'rh_account': data.get('account'),  # deprecated key, temp for backward compatibility
+                            'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
+                        }
                     }
                 )
             elif result.lower() == 'failure':
@@ -322,10 +327,10 @@ class UploadHandler(tornado.web.RequestHandler):
         # use dummy values for now if no account given
         logger.info('identity - %s', self.identity)
         if self.identity:
-            values['rh_account'] = self.identity['account_number']
+            values['account'] = self.identity['account_number']
             values['principal'] = self.identity.get('internal').get('org_id')
         else:
-            values['rh_account'] = DUMMY_VALUES['rh_account']
+            values['account'] = DUMMY_VALUES['account']
             values['principal'] = DUMMY_VALUES['principal']
         values['payload_id'] = self.payload_id
         values['hash'] = self.payload_id  # provided for backward compatibility
