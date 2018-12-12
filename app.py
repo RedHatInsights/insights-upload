@@ -64,7 +64,6 @@ DUMMY_VALUES = {
 }
 
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
-PUP_QUEUE = os.getenv('PUP_QUEUE', 'platform.upload.advisor-pup')
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
@@ -203,7 +202,6 @@ async def handle_file(msgs):
                 url = await IOLoop.current().run_in_executor(
                     None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
                 )
-                logger.info(url)
                 produce_queue.append(
                     {
                         'topic': 'platform.upload.available',
@@ -325,7 +323,6 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         values = {}
         # use dummy values for now if no account given
-        logger.info('identity - %s', self.identity)
         if self.identity:
             values['account'] = self.identity['account_number']
             values['rh_account'] = self.identity['account_number']
@@ -346,10 +343,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if url:
             values['url'] = url
 
-            if self.service == 'advisor':
-                produce_queue.append({'topic': PUP_QUEUE, 'msg': values})
-            else:
-                produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
+            produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] put on produce queue (qsize: %d)",
                 self.payload_id, len(produce_queue)
@@ -412,7 +406,6 @@ class UploadHandler(tornado.web.RequestHandler):
             self.metadata = self.request.body_arguments['metadata'][0].decode('utf-8') if self.request.body_arguments.get('metadata') else None
             self.service = split_content(self.request.files['upload'][0]['content_type'])
             if self.request.headers.get('x-rh-identity'):
-                logger.info('x-rh-identity: %s', base64.b64decode(self.request.headers['x-rh-identity']))
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 self.identity = header['identity']
                 self.b64_identity = self.request.headers['x-rh-identity']
