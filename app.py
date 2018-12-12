@@ -257,7 +257,7 @@ class UploadHandler(tornado.web.RequestHandler):
             error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + str(MAX_LENGTH) + ' bytes')
             mnm.uploads_too_large.inc()
             return error
-        if re.search(content_regex, self.request.files['upload'][0]['content_type']) is None:
+        if re.search(content_regex, self.payload_data['content_type']) is None:
             mnm.uploads_unsupported_filetype.inc()
             error = (415, 'Unsupported Media Type')
             return error
@@ -379,12 +379,15 @@ class UploadHandler(tornado.web.RequestHandler):
         mnm.uploads_total.inc()
         self.identity = None
 
-        if not self.request.files.get('upload'):
+        if not self.request.files.get('upload') and not self.request.files.get('file'):
             logger.info('Upload field not found')
             self.set_status(415, "Upload field not found")
             return
 
         self.payload_id = self.request.headers.get('x-rh-insights-request-id')
+
+        # TODO: pull this out once no one is using the upload field anymore
+        self.payload_data = self.request.files.get('upload')[0] if self.request.files.get('upload') else self.request.files.get('file')[0]
 
         if self.payload_id is None:
             msg = "No payload_id assigned. Upload Failed"
@@ -404,13 +407,13 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_valid.inc()
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             self.metadata = self.request.body_arguments['metadata'][0].decode('utf-8') if self.request.body_arguments.get('metadata') else None
-            self.service = split_content(self.request.files['upload'][0]['content_type'])
+            self.service = split_content(self.payload_data['content_type'])
             if self.request.headers.get('x-rh-identity'):
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 self.identity = header['identity']
                 self.b64_identity = self.request.headers['x-rh-identity']
             self.size = int(self.request.headers['Content-Length'])
-            body = self.request.files['upload'][0]['body']
+            body = self.payload_data['body']
 
             self.filename = await IOLoop.current().run_in_executor(None, self.write_data, body)
 
