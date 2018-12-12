@@ -328,7 +328,8 @@ class UploadHandler(tornado.web.RequestHandler):
         logger.info('identity - %s', self.identity)
         if self.identity:
             values['account'] = self.identity['account_number']
-            values['principal'] = self.identity.get('internal').get('org_id')
+            values['rh_account'] = self.identity['account_number']
+            values['principal'] = self.identity['internal'].get('org_id') if self.identity.get('internal') else None
         else:
             values['account'] = DUMMY_VALUES['account']
             values['principal'] = DUMMY_VALUES['principal']
