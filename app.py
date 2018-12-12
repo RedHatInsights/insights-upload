@@ -319,7 +319,7 @@ class UploadHandler(tornado.web.RequestHandler):
             identity {str} -- identity pulled from request headers (if present)
             service {str} -- The service this upload is intended for
 
-        Write to storage, send message to MQ, send metrics to influxDB
+        Write to storage, send message to MQ
         """
         values = {}
         # use dummy values for now if no account given
@@ -348,9 +348,6 @@ class UploadHandler(tornado.web.RequestHandler):
                 "Data for payload_id [%s] put on produce queue (qsize: %d)",
                 self.payload_id, len(produce_queue)
             )
-
-            # TODO: send a metric to influx for a failed upload too?
-            IOLoop.current().run_in_executor(None, mnm.send_to_influxdb, values)
 
     def write_data(self, body):
         """Writes the uploaded data to a tmp file in prepartion for writing to
