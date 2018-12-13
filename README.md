@@ -90,6 +90,7 @@ The following topics are currently in use in the MQ service:
   - platform.upload.available           # for new uploads available to other services
   - platform.upload.hccm                # HCCM service
   - platform.upload.compliance          # Compliance service
+  - platform.upload.qpc                 # QPC service
 
 ### Errors
 
