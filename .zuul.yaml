@@ -1,0 +1,5 @@
+- project:
+    check:
+      jobs:
+        - tox-linters:
+            nodeset: fedora-latest-1vcpu

@@ -7,7 +7,7 @@ info:
   version: 0.0.1
   title: Upload Service
   contact:
-    email: sadams@redhat.com
+      email: sadams@redhat.com
 
 paths:
   /:
