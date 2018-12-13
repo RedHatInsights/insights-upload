@@ -280,7 +280,8 @@ The commands for that process are as follows:
     
     ===Copy to production cluster===
     skopeo copy --src-creds=user:dev_login_token --dest-creds=user:prod_login_token \
-    docker://registry.insights-dev.openshift.com/platform-qa/upload-service:latest \ docker://registry.insights.openshift.com/platform-stage/upload-service:latest
+    docker://registry.insights-dev.openshift.com/platform-qa/upload-service:latest \  
+    docker://registry.insights.openshift.com/platform-stage/upload-service:latest
 
     ===In insights production cluster===
     oc tag platform-stage/upload-service:latest platform-prod/upload-service:latest
