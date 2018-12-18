@@ -185,7 +185,7 @@ async def handle_file(msgs):
 
         if 'payload_id' not in data and 'hash' not in data:
             logger.error("payload_id or hash not in message. Payload not removed from quarantine.")
-            return
+            continue
 
         # get the payload_id. Getting the hash is temporary until consumers update
         payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
