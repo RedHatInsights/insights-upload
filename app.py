@@ -106,16 +106,14 @@ class MQClient(object):
         return _f
 
 
-mqc = AIOKafkaConsumer(
+CONSUMER = MQClient(AIOKafkaConsumer(
     VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
     group_id=MQ_GROUP_ID
-)
-mqp = AIOKafkaProducer(
+), "consumer")
+PRODUCER = MQClient(AIOKafkaProducer(
     loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
     connections_max_idle_ms=None
-)
-CONSUMER = MQClient(mqc, "consumer")
-PRODUCER = MQClient(mqp, "producer")
+), "producer")
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque([], 999)
