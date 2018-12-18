@@ -10,7 +10,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
 from tempfile import NamedTemporaryFile
-from time import sleep, time
+from time import time
 
 import tornado.ioloop
 import tornado.web
@@ -451,7 +451,6 @@ app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
 
 
 def main():
-    sleep(10)
     app.listen(LISTEN_PORT)
     logger.info(f"Web server listening on port {LISTEN_PORT}")
     loop = IOLoop.current()
