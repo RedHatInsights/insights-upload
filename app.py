@@ -10,7 +10,7 @@ import sys
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
 from tempfile import NamedTemporaryFile
-from time import sleep, time
+from time import time
 
 import tornado.ioloop
 import tornado.web
@@ -106,16 +106,14 @@ class MQClient(object):
         return _f
 
 
-mqc = AIOKafkaConsumer(
+CONSUMER = MQClient(AIOKafkaConsumer(
     VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
     group_id=MQ_GROUP_ID
-)
-mqp = AIOKafkaProducer(
+), "consumer")
+PRODUCER = MQClient(AIOKafkaProducer(
     loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
     connections_max_idle_ms=None
-)
-CONSUMER = MQClient(mqc, "consumer")
-PRODUCER = MQClient(mqp, "producer")
+), "producer")
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque([], 999)
@@ -187,7 +185,7 @@ async def handle_file(msgs):
 
         if 'payload_id' not in data and 'hash' not in data:
             logger.error("payload_id or hash not in message. Payload not removed from quarantine.")
-            return
+            continue
 
         # get the payload_id. Getting the hash is temporary until consumers update
         payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
@@ -254,14 +252,13 @@ class UploadHandler(tornado.web.RequestHandler):
         Returns:
             tuple -- status code and a user friendly message
         """
-        if int(self.request.headers['Content-Length']) >= MAX_LENGTH:
-            error = (413, 'Payload too large: ' + self.request.headers['Content-Length'] + '. Should not exceed ' + str(MAX_LENGTH) + ' bytes')
+        content_length = int(self.request.headers["Content-Length"])
+        if content_length >= MAX_LENGTH:
             mnm.uploads_too_large.inc()
-            return error
+            return self.error(413, f"Payload too large: {content_length}. Should not exceed {MAX_LENGTH} bytes")
         if re.search(content_regex, self.payload_data['content_type']) is None:
             mnm.uploads_unsupported_filetype.inc()
-            error = (415, 'Unsupported Media Type')
-            return error
+            return self.error(415, 'Unsupported Media Type')
 
     def get(self):
         """Handles GET requests to the upload endpoint
@@ -368,6 +365,13 @@ class UploadHandler(tornado.web.RequestHandler):
             filename = tmp.name
         return filename
 
+    def error(self, code, message):
+        logger.error(message)
+        self.set_status(code, message)
+        self.set_header("Content-Type", "text/plain")
+        self.write(message)
+        return (code, message)
+
     async def post(self):
         """Handle POST requests to the upload endpoint
 
@@ -378,9 +382,7 @@ class UploadHandler(tornado.web.RequestHandler):
         self.identity = None
 
         if not self.request.files.get('upload') and not self.request.files.get('file'):
-            logger.info('Upload field not found')
-            self.set_status(415, "Upload field not found")
-            return
+            return self.error(415, "Upload field not found")
 
         self.payload_id = self.request.headers.get('x-rh-insights-request-id')
 
@@ -388,19 +390,10 @@ class UploadHandler(tornado.web.RequestHandler):
         self.payload_data = self.request.files.get('upload')[0] if self.request.files.get('upload') else self.request.files.get('file')[0]
 
         if self.payload_id is None:
-            msg = "No payload_id assigned. Upload Failed"
-            logger.error(msg)
-            self.set_header("Content-Type", "text/plain")
-            self.set_status(400)
-            self.write(msg)
-            return
+            return self.error(400, "No payload_id assigned.  Upload failed.")
 
-        invalid = self.upload_validation()
-
-        if invalid:
+        if self.upload_validation():
             mnm.uploads_invalid.inc()
-            self.set_status(invalid[0], invalid[1])
-            return
         else:
             mnm.uploads_valid.inc()
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
@@ -415,14 +408,12 @@ class UploadHandler(tornado.web.RequestHandler):
 
             self.filename = await IOLoop.current().run_in_executor(None, self.write_data, body)
 
-            response = {'status': (202, 'Accepted')}
-            self.set_status(response['status'][0], response['status'][1])
+            self.set_status(202, "Accepted")
 
             # Offload the handling of the upload and producing to kafka
             asyncio.ensure_future(
                 self.process_upload()
             )
-            return
 
     def options(self):
         """Handle OPTIONS request to upload endpoint
@@ -460,7 +451,6 @@ app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
 
 
 def main():
-    sleep(10)
     app.listen(LISTEN_PORT)
     logger.info(f"Web server listening on port {LISTEN_PORT}")
     loop = IOLoop.current()

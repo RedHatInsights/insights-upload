@@ -184,15 +184,15 @@ class TestProducerAndConsumer:
 
         with FakeMQ() as mq:
             producer = app.MQClient(mq, "producer").run(app.make_preprocessor())
-            assert app.mqp.produce_calls_count == 0
+            assert mq.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
             event_loop.run_until_complete(self.coroutine_test(producer))
 
-            assert app.mqp.produce_calls_count == total_messages
+            assert mq.produce_calls_count == total_messages
             assert len(app.produce_queue) == 0
-            assert app.mqp.disconnect_in_operation_called is False
-            assert app.mqp.trying_to_connect_failures_calls == 0
+            assert mq.disconnect_in_operation_called is False
+            assert mq.trying_to_connect_failures_calls == 0
 
     def test_consumer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
@@ -206,16 +206,16 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
                 )
-                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
+                mq.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
                 produced_messages.append(message)
 
             for m in produced_messages:
                 assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
-            assert app.mqc.produce_calls_count == total_messages
-            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert mq.produce_calls_count == total_messages
+            assert mq.count_topic_messages(topic) == total_messages
             assert len(app.produce_queue) == 0
-            assert app.mqc.consume_calls_count == 0
+            assert mq.consume_calls_count == 0
 
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
@@ -226,12 +226,12 @@ class TestProducerAndConsumer:
 
                 assert s3_storage.ls(s3_storage.PERM, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
-            assert app.mqc.consume_calls_count > 0
-            assert app.mqc.consume_return_messages_count == 1
+            assert mq.consume_calls_count > 0
+            assert mq.consume_return_messages_count == 1
 
-            assert app.mqc.count_topic_messages(topic) == 0
-            assert app.mqc.disconnect_in_operation_called is False
-            assert app.mqc.trying_to_connect_failures_calls == 0
+            assert mq.count_topic_messages(topic) == 0
+            assert mq.disconnect_in_operation_called is False
+            assert mq.trying_to_connect_failures_calls == 0
             assert len(app.produce_queue) == 4
 
     def test_consumer_with_validation_failure(self, local_file, s3_mocked, broker_stage_messages, event_loop):
@@ -247,13 +247,13 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='failure'
                 )
-                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
+                mq.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
                 produced_messages.append(message)
 
-            assert app.mqc.produce_calls_count == total_messages
-            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert mq.produce_calls_count == total_messages
+            assert mq.count_topic_messages(topic) == total_messages
             assert len(app.produce_queue) == 0
-            assert app.mqc.consume_calls_count == 0
+            assert mq.consume_calls_count == 0
 
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
@@ -264,12 +264,12 @@ class TestProducerAndConsumer:
 
                 assert s3_storage.ls(s3_storage.REJECT, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
-            assert app.mqc.consume_calls_count > 0
-            assert app.mqc.consume_return_messages_count == 1
+            assert mq.consume_calls_count > 0
+            assert mq.consume_return_messages_count == 1
 
-            assert app.mqc.count_topic_messages(topic) == 0
-            assert app.mqc.disconnect_in_operation_called is False
-            assert app.mqc.trying_to_connect_failures_calls == 0
+            assert mq.count_topic_messages(topic) == 0
+            assert mq.disconnect_in_operation_called is False
+            assert mq.trying_to_connect_failures_calls == 0
             assert len(app.produce_queue) == 0
 
     def test_consumer_with_validation_unknown(self, local_file, s3_mocked, broker_stage_messages, event_loop):
@@ -285,22 +285,22 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='unknown'
                 )
-                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
+                mq.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
                 produced_messages.append(message)
 
-            assert app.mqc.produce_calls_count == total_messages
-            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert mq.produce_calls_count == total_messages
+            assert mq.count_topic_messages(topic) == total_messages
             assert len(app.produce_queue) == 0
-            assert app.mqc.consume_calls_count == 0
+            assert mq.consume_calls_count == 0
 
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
-            assert app.mqc.consume_calls_count > 0
-            assert app.mqc.consume_return_messages_count == 1
+            assert mq.consume_calls_count > 0
+            assert mq.consume_return_messages_count == 1
 
-            assert app.mqc.count_topic_messages(topic) == 0
-            assert app.mqc.disconnect_in_operation_called is False
-            assert app.mqc.trying_to_connect_failures_calls == 0
+            assert mq.count_topic_messages(topic) == 0
+            assert mq.disconnect_in_operation_called is False
+            assert mq.trying_to_connect_failures_calls == 0
             assert len(app.produce_queue) == 0
 
     @patch("app.RETRY_INTERVAL", 0.01)
@@ -311,15 +311,15 @@ class TestProducerAndConsumer:
 
         with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2) as mq:
             producer = app.MQClient(mq, "producer").run(app.make_preprocessor())
-            assert app.mqp.produce_calls_count == 0
+            assert mq.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
             event_loop.run_until_complete(self.coroutine_test(producer))
 
-            assert app.mqp.produce_calls_count == total_messages
+            assert mq.produce_calls_count == total_messages
             assert len(app.produce_queue) == 0
-            assert app.mqp.disconnect_in_operation_called is True
-            assert app.mqp.trying_to_connect_failures_calls == 1
+            assert mq.disconnect_in_operation_called is True
+            assert mq.trying_to_connect_failures_calls == 1
 
     @patch("app.RETRY_INTERVAL", 0.01)
     def test_consumer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
@@ -333,19 +333,19 @@ class TestProducerAndConsumer:
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
                 )
-                app.mqc.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
+                mq.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
 
-            assert app.mqc.produce_calls_count == total_messages
-            assert app.mqc.count_topic_messages(topic) == total_messages
+            assert mq.produce_calls_count == total_messages
+            assert mq.count_topic_messages(topic) == total_messages
             assert len(app.produce_queue) == 0
-            assert app.mqc.consume_calls_count == 0
+            assert mq.consume_calls_count == 0
 
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
-            assert app.mqc.consume_calls_count > 0
-            assert app.mqc.consume_return_messages_count == 1
+            assert mq.consume_calls_count > 0
+            assert mq.consume_return_messages_count == 1
 
-            assert app.mqc.count_topic_messages(topic) == 0
-            assert app.mqc.disconnect_in_operation_called is True
-            assert app.mqc.trying_to_connect_failures_calls == 1
+            assert mq.count_topic_messages(topic) == 0
+            assert mq.disconnect_in_operation_called is True
+            assert mq.trying_to_connect_failures_calls == 1
             assert len(app.produce_queue) == 4
