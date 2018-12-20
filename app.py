@@ -136,15 +136,20 @@ def make_preprocessor(queue=None):
             await asyncio.sleep(0.1)
         else:
             item = queue.popleft()
-            topic, msg = item["topic"], item["msg"]
+            topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
             logger.info(
-                "Popped item from produce queue (qsize: %d): topic %s: %s",
-                len(queue), topic, msg
+                "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
+                len(queue), topic, payload_id, msg
             )
             try:
                 await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
+                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id)
             except KafkaError:
                 queue.append(item)
+                logger.error(
+                    "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
+                    topic, payload_id, len(queue)
+                )
                 raise
     return send_to_preprocessors
 
@@ -173,7 +178,7 @@ async def handle_file(msgs):
         payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
         result = data['validation']
 
-        logger.info('processing message: %s - %s', payload_id, result)
+        logger.info('processing message: payload [%s] - %s', payload_id, result)
 
         if storage.ls(storage.QUARANTINE, payload_id)['ResponseMetadata']['HTTPStatusCode'] == 200:
             if result.lower() == 'success':
@@ -182,32 +187,35 @@ async def handle_file(msgs):
                 url = await IOLoop.current().run_in_executor(
                     None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
                 )
-                produce_queue.append(
-                    {
-                        'topic': 'platform.upload.available',
-                        'msg': {
-                            'id': data.get('id'),
-                            'url': url,
-                            'service': data.get('service'),
-                            'payload_id': payload_id,
-                            'account': data.get('account'),
-                            'principal': data.get('principal'),
-                            'b64_identity': data.get('b64_identity'),
-                            'rh_account': data.get('account'),  # deprecated key, temp for backward compatibility
-                            'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
-                        }
+                data = {
+                    'topic': 'platform.upload.available',
+                    'msg': {
+                        'id': data.get('id'),
+                        'url': url,
+                        'service': data.get('service'),
+                        'payload_id': payload_id,
+                        'account': data.get('account'),
+                        'principal': data.get('principal'),
+                        'b64_identity': data.get('b64_identity'),
+                        'rh_account': data.get('account'),  # deprecated key, temp for backward compatibility
+                        'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
                     }
+                }
+                produce_queue.append(data)
+                logger.info(
+                    "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d): %s",
+                    data['topic'], payload_id, len(produce_queue), data
                 )
             elif result.lower() == 'failure':
                 mnm.uploads_invalidated.inc()
-                logger.info('%s rejected', payload_id)
+                logger.info('payload_id [%s] rejected', payload_id)
                 url = await IOLoop.current().run_in_executor(
                     None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
                 )
             else:
                 logger.info('Unrecognized result: %s', result.lower())
         else:
-            logger.info('Payload ID no longer in quarantine: %s', payload_id)
+            logger.info('payload_id [%s] no longer in quarantine', payload_id)
 
 
 class RootHandler(tornado.web.RequestHandler):
@@ -325,10 +333,11 @@ class UploadHandler(tornado.web.RequestHandler):
         if url:
             values['url'] = url
 
-            produce_queue.append({'topic': 'platform.upload.' + self.service, 'msg': values})
+            topic = 'platform.upload.' + self.service
+            produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
-                "Data for payload_id [%s] put on produce queue (qsize: %d)",
-                self.payload_id, len(produce_queue)
+                "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
+                self.payload_id, topic, len(produce_queue)
             )
 
     def write_data(self, body):
