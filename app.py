@@ -15,6 +15,7 @@ from time import time
 import tornado.ioloop
 import tornado.web
 from tornado.ioloop import IOLoop
+from kafkahelpers import ReconnectingClient
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
@@ -70,50 +71,12 @@ MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 
 
-class MQClient(object):
-
-    def __init__(self, client, name):
-        self.client = client
-        self.name = name
-        self.connected = False
-
-    def __str__(self):
-        return f"MQClient {self.name} {self.client} {'connected' if self.connected else 'disconnected'}"
-
-    async def start(self):
-        while not self.connected:
-            try:
-                logger.info("Attempting to connect %s client.", self.name)
-                await self.client.start()
-                logger.info("%s client connected successfully.", self.name)
-                self.connected = True
-            except KafkaError:
-                logger.exception("Failed to connect %s client, retrying in %d seconds.", self.name, RETRY_INTERVAL)
-                await asyncio.sleep(RETRY_INTERVAL)
-
-    async def work(self, worker):
-        try:
-            await worker(self.client)
-        except KafkaError:
-            logger.exception("Encountered exception while working with %s client, reconnecting.", self.name)
-            self.connected = False
-
-    def run(self, worker):
-        async def _f():
-            while True:
-                await self.start()
-                await self.work(worker)
-        return _f
-
-
-CONSUMER = MQClient(AIOKafkaConsumer(
-    VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
-    group_id=MQ_GROUP_ID
-), "consumer")
-PRODUCER = MQClient(AIOKafkaProducer(
-    loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ, request_timeout_ms=10000,
-    connections_max_idle_ms=None
-), "producer")
+kafka_consumer = AIOKafkaConsumer(VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop,
+                                  bootstrap_servers=MQ, group_id=MQ_GROUP_ID)
+kafka_producer = AIOKafkaProducer(loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
+                                  request_timeout_ms=10000, connections_max_idle_ms=None)
+CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
+PRODUCER = ReconnectingClient(kafka_producer, "producer")
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque([], 999)
@@ -455,8 +418,8 @@ def main():
     logger.info(f"Web server listening on port {LISTEN_PORT}")
     loop = IOLoop.current()
     loop.set_default_executor(thread_pool_executor)
-    loop.spawn_callback(CONSUMER.run(handle_validation))
-    loop.spawn_callback(PRODUCER.run(make_preprocessor(produce_queue)))
+    loop.spawn_callback(CONSUMER.get_callback(handle_validation))
+    loop.spawn_callback(PRODUCER.get_callback(make_preprocessor(produce_queue)))
     try:
         loop.start()
     except KeyboardInterrupt:

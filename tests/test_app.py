@@ -10,6 +10,7 @@ from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 from unittest import TestCase
 from re import search
+from kafkahelpers import ReconnectingClient
 
 
 import app
@@ -183,7 +184,8 @@ class TestProducerAndConsumer:
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
         with FakeMQ() as mq:
-            producer = app.MQClient(mq, "producer").run(app.make_preprocessor())
+            client = ReconnectingClient(mq, "producer")
+            producer = client.get_callback(app.make_preprocessor())
             assert mq.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
@@ -200,7 +202,8 @@ class TestProducerAndConsumer:
         topic = 'platform.upload.validation'
         produced_messages = []
         with FakeMQ() as mq:
-            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
+            client = ReconnectingClient(mq, "consumer")
+            consumer = client.get_callback(app.handle_validation)
 
             for _ in range(total_messages):
                 message = self._create_message_s3(
@@ -242,7 +245,8 @@ class TestProducerAndConsumer:
         produced_messages = []
 
         with FakeMQ() as mq:
-            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
+            client = ReconnectingClient(mq, "consumer")
+            consumer = client.get_callback(app.handle_validation)
             for _ in range(total_messages):
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='failure'
@@ -280,7 +284,8 @@ class TestProducerAndConsumer:
         produced_messages = []
 
         with FakeMQ() as mq:
-            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
+            client = ReconnectingClient(mq, "consumer")
+            consumer = client.get_callback(app.handle_validation)
             for _ in range(total_messages):
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic, validation='unknown'
@@ -310,7 +315,8 @@ class TestProducerAndConsumer:
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
         with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2) as mq:
-            producer = app.MQClient(mq, "producer").run(app.make_preprocessor())
+            client = ReconnectingClient(mq, "producer")
+            producer = client.get_callback(app.make_preprocessor())
             assert mq.produce_calls_count == 0
             assert len(app.produce_queue) == total_messages
 
@@ -328,7 +334,8 @@ class TestProducerAndConsumer:
         topic = 'platform.upload.validation'
 
         with FakeMQ(connection_failing_attempt_countdown=1, disconnect_in_operation=2) as mq:
-            consumer = app.MQClient(mq, "consumer").run(app.handle_validation)
+            client = ReconnectingClient(mq, "consumer")
+            consumer = client.get_callback(app.handle_validation)
             for _ in range(total_messages):
                 message = self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
