@@ -22,6 +22,7 @@ botocore = "*"
 aiokafka = "*"
 logstash_formatter = "*"
 prometheus-client = ">=0.5.0"
+kafkahelpers = "*"
 
 [requires]
 python_version = "3.6"
