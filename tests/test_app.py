@@ -5,7 +5,6 @@ import os
 
 import pytest
 import requests
-from botocore.exceptions import ClientError
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 from unittest import TestCase

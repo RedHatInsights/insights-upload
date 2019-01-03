@@ -39,9 +39,8 @@ def ls(src, uuid):
     try:
         result = s3.head_object(Bucket=src, Key=uuid)
         return result
-    except ClientError as e:
+    except ClientError:
         return 404
-
 
 
 def up_check(name):
