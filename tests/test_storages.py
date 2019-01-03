@@ -83,7 +83,7 @@ class TestS3(object):
     def test_ls_not_found(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 
-        assert s3_storage.ls(s3_storage.QUARANTINE, key_name) == 404
+        assert s3_storage.ls(s3_storage.QUARANTINE, key_name)['ResponseMetadata']['HTTPStatusCode'] == 404
 
 
 class TestLocalDisk(object):

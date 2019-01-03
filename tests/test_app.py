@@ -219,7 +219,7 @@ class TestProducerAndConsumer:
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
-                assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id']) == 404
+                assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 404
                 assert s3_storage.ls(s3_storage.PERM, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert mq.consume_calls_count > 0
@@ -254,7 +254,7 @@ class TestProducerAndConsumer:
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
-                assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id']) == 404
+                assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 404
                 assert s3_storage.ls(s3_storage.REJECT, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert mq.consume_calls_count > 0

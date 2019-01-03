@@ -40,7 +40,7 @@ def ls(src, uuid):
         result = s3.head_object(Bucket=src, Key=uuid)
         return result
     except ClientError:
-        return 404
+        return {'ResponseMetadata': {'HTTPStatusCode': 404}}
 
 
 def up_check(name):
