@@ -36,7 +36,12 @@ def copy(src, dest, uuid):
 
 
 def ls(src, uuid):
-    return s3.head_object(Bucket=src, Key=uuid)
+    try:
+        result = s3.head_object(Bucket=src, Key=uuid)
+        return result
+    except ClientError as e:
+        return 404
+
 
 
 def up_check(name):
