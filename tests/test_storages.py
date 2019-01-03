@@ -83,10 +83,7 @@ class TestS3(object):
     def test_ls_not_found(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 
-        with pytest.raises(ClientError) as e:
-            s3_storage.ls(s3_storage.QUARANTINE, key_name)
-
-        assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
+        assert s3_storage.ls(s3_storage.QUARANTINE, key_name) == 404
 
 
 class TestLocalDisk(object):

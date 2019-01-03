@@ -220,10 +220,7 @@ class TestProducerAndConsumer:
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
-                with pytest.raises(ClientError) as e:
-                    s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])
-                assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
-
+                assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id']) == 404
                 assert s3_storage.ls(s3_storage.PERM, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert mq.consume_calls_count > 0
@@ -258,10 +255,7 @@ class TestProducerAndConsumer:
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
-                with pytest.raises(ClientError) as e:
-                    s3_storage.ls(s3_storage.QUARANTINE, m['payload_id'])
-                assert str(e.value) == 'An error occurred (404) when calling the HeadObject operation: Not Found'
-
+                assert s3_storage.ls(s3_storage.QUARANTINE, m['payload_id']) == 404
                 assert s3_storage.ls(s3_storage.REJECT, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert mq.consume_calls_count > 0
