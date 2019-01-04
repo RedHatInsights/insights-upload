@@ -1,13 +1,13 @@
 swagger: "2.0"
 basePath: /
 schemes:
-    - https
+  - https
 info:
   description: "The Upload Service is designed to ingest payloads from customers and distribute them via a message queue to other Platform services."
   version: 0.0.1
   title: Upload Service
   contact:
-      email: sadams@redhat.com
+    email: sadams@redhat.com
 
 paths:
   /:
