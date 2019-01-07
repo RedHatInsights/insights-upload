@@ -43,6 +43,12 @@ storage = import_module("utils.storage.{}".format(storage_driver))
 # Upload content type must match this regex. Third field matches end service
 content_regex = r'^application/vnd\.redhat\.([a-z0-9-]+)\.([a-z0-9-]+)\+(tgz|zip)$'
 
+# Items in this map are _special cases_ where the service cannot be extracted
+# from the Content-Type
+SERVICE_MAP = {
+    'application/gzip': 'advisor'
+}
+
 # set max length to 10.5 MB (one MB larger than peak)
 MAX_LENGTH = int(os.getenv('MAX_LENGTH', 11010048))
 LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
@@ -100,6 +106,19 @@ def split_content(content):
     """
     service = content.split('.')[2]
     return service
+
+
+def get_service(content_type):
+    """
+    Returns the service that content_type maps to.
+    """
+    if content_type in SERVICE_MAP:
+        return SERVICE_MAP[content_type]
+    else:
+        m = re.search(content_regex, content_type)
+        if m:
+            return split_content(content_type)
+    raise Exception("Could not resolve a service from the given content_type")
 
 
 async def handle_validation(client):
@@ -219,7 +238,9 @@ class UploadHandler(tornado.web.RequestHandler):
         if content_length >= MAX_LENGTH:
             mnm.uploads_too_large.inc()
             return self.error(413, f"Payload too large: {content_length}. Should not exceed {MAX_LENGTH} bytes")
-        if re.search(content_regex, self.payload_data['content_type']) is None:
+        try:
+            get_service(self.payload_data['content_type'])
+        except Exception:
             mnm.uploads_unsupported_filetype.inc()
             return self.error(415, 'Unsupported Media Type')
 
@@ -361,7 +382,7 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_valid.inc()
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             self.metadata = self.request.body_arguments['metadata'][0].decode('utf-8') if self.request.body_arguments.get('metadata') else None
-            self.service = split_content(self.payload_data['content_type'])
+            self.service = get_service(self.payload_data['content_type'])
             if self.request.headers.get('x-rh-identity'):
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 self.identity = header['identity']

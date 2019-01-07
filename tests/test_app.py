@@ -58,6 +58,10 @@ class TestContentRegex(TestCase):
             with self.subTest(mime_type=mime_type):
                 self.assertIsNone(search(app.content_regex, mime_type))
 
+    def test_supports_legacy(self):
+        self.assertEqual("advisor", app.get_service("application/gzip"))
+        self.assertEqual("fab", app.get_service("application/vnd.redhat.fab.service+tgz"))
+
 
 class TestUploadHandler(AsyncHTTPTestCase):
 
