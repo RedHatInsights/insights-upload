@@ -203,9 +203,10 @@ async def handle_file(msgs):
                 }
                 produce_queue.append(data)
                 logger.info(
-                    "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d): %s",
-                    data['topic'], payload_id, len(produce_queue), data
+                    "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
+                    data['topic'], payload_id, len(produce_queue)
                 )
+                logger.debug("payload_id [%s] data: %s", payload_id, data)
             elif result.lower() == 'failure':
                 mnm.uploads_invalidated.inc()
                 logger.info('payload_id [%s] rejected', payload_id)
