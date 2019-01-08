@@ -251,6 +251,7 @@ class UploadHandler(tornado.web.RequestHandler):
             get_service(self.payload_data['content_type'])
         except Exception:
             mnm.uploads_unsupported_filetype.inc()
+            logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
             return self.error(415, 'Unsupported Media Type')
 
     def get(self):
