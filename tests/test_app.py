@@ -59,7 +59,7 @@ class TestContentRegex(TestCase):
                 self.assertIsNone(search(app.content_regex, mime_type))
 
     def test_supports_legacy(self):
-        self.assertEqual("advisor", app.get_service("application/x-gzip"))
+        self.assertEqual("advisor", app.get_service("application/x-gzip; charset=binary"))
         self.assertEqual("fab", app.get_service("application/vnd.redhat.fab.service+tgz"))
 
 
