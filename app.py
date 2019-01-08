@@ -46,7 +46,7 @@ content_regex = r'^application/vnd\.redhat\.([a-z0-9-]+)\.([a-z0-9-]+)\+(tgz|zip
 # Items in this map are _special cases_ where the service cannot be extracted
 # from the Content-Type
 SERVICE_MAP = {
-    'application/x-gzip': 'advisor'
+    'application/x-gzip; charset=binary': 'advisor'
 }
 
 # set max length to 10.5 MB (one MB larger than peak)
