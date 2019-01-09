@@ -83,7 +83,7 @@ class FakeMQ(object):
         return True
 
     @gen.coroutine
-    def getmany(self, avoid_iteration_control=False) -> Dict:
+    def getmany(self, avoid_iteration_control=False, timeout_ms=None, max_records=None) -> Dict:
         # At the moment, this is the only topic we consume from ...
         topic = "platform.upload.validation"
 
