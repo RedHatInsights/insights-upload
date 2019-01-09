@@ -15,9 +15,11 @@ from time import time
 import tornado.ioloop
 import tornado.web
 import tornado.httpclient
+import aiohttp
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
 
+from aiohttp.client_exceptions import ClientConnectionError
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
 from utils import mnm
@@ -258,14 +260,19 @@ class UploadHandler(tornado.web.RequestHandler):
             return self.error(415, 'Unsupported Media Type')
 
     async def post_to_inventory(self, values):
-        headers = {'x-rh-identity': self.b64_identity}
-        values['facts'] = [values['metadata']]
-        body = json.dumps(values)
+        headers = {'x-rh-identity': self.b64_identity, 'Content-Type': 'application/json'}
+        post = values['metadata']
+        post['account'] = values['account']
         try:
-            response = tornado.httpclient.HTTPRequest(INVENTORY_URL, method='POST', body=body, headers=headers)
-            logger.info("Posted to metadata to inventory. Payload ID [%s] - %s", self.payload_id, response.body)
-        except tornado.httpclient.HTTPClientError as e:
-            logger.error("Failed to post data to inventory. Payload ID [%s] - %s: %s", self.payload_id, e.code, e.response)
+            timeout = aiohttp.ClientTimeout(total=60)
+            async with aiohttp.ClientSession() as session:
+                async with session.post(INVENTORY_URL, data=json.dumps(post), headers=headers, timeout=timeout) as response:
+                    if response.status != 200 and response.status != 201:
+                        logger.error('Failed to post to inventory: ' + await response.text())
+                    else:
+                        logger.info("Payload posted to inventory: %s", self.payload_id)
+        except ClientConnectionError as e:
+            logger.error("Unable to contact inventory: %s", e)
 
     def get(self):
         """Handles GET requests to the upload endpoint
