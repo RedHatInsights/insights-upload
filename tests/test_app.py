@@ -5,12 +5,13 @@ import os
 
 import pytest
 import requests
+import responses
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 from unittest import TestCase
 from re import search
 from kafkahelpers import ReconnectingClient
-
+from requests import ConnectionError
 
 import app
 from tests.fixtures.fake_mq import FakeMQ
@@ -72,7 +73,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
         # Build HTTP Request so that Tornado can recognize and use the payload test
         request = requests.Request(
             url="http://localhost:8888/r/insights/platform/upload/api/v1/upload", data={},
-            files={file_field_name: (file_name, io.BytesIO(os.urandom(file_size)), mime_type)} if file_name else None
+            files={file_field_name: (file_name, io.BytesIO(os.urandom(file_size)), mime_type)} if file_name else None,
         )
         request.headers["x-rh-insights-request-id"] = "test"
 
@@ -166,6 +167,33 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         self.assertEqual(response.exception.code, 415)
         self.assertEqual(response.exception.message, 'Upload field not found')
+
+
+class TestInventoryPost(object):
+
+    @responses.activate
+    @patch("app.INVENTORY_URL", "http://fakeinventory.com/r/insights/platform/inventory/api/v1/hosts")
+    def test_post_to_inventory_success(self):
+        values = {"account": "12345", "metadata": {"some_key": "some_value"}}
+        responses.add(responses.POST, app.INVENTORY_URL,
+                      json={"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, status=200)
+        method_response = app.post_to_inventory('1234', 'abcd1234', values)
+
+        assert method_response is 200
+        assert len(responses.calls) == 1
+        assert responses.calls[0].response.text == '{"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}'
+
+    @responses.activate
+    @patch("app.INVENTORY_URL", "http://fakeinventory.com/r/insights/platform/inventory/api/v1/hosts")
+    def test_post_to_inventory_fail(self):
+        values = {"account": "12345", "metadata": {"bad_key": "bad_value"}}
+        responses.add(responses.POST, app.INVENTORY_URL,
+                      json={"error message": "boop"}, status=400)
+        method_response = app.post_to_inventory('1234', 'abcd1234', values)
+
+        assert method_response is 400
+        assert len(responses.calls) == 1
+        assert responses.calls[0].response.text == '{"error message": "boop"}'
 
 
 class TestProducerAndConsumer:
