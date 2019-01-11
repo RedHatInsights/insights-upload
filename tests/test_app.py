@@ -11,7 +11,6 @@ from tornado.testing import AsyncHTTPTestCase, gen_test
 from unittest import TestCase
 from re import search
 from kafkahelpers import ReconnectingClient
-from requests import ConnectionError
 
 import app
 from tests.fixtures.fake_mq import FakeMQ
