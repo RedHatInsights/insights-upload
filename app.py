@@ -441,7 +441,7 @@ class VersionHandler(tornado.web.RequestHandler):
         self.write(response)
 
 
-class MetricsHandler(tornado.web.RequestHandler):
+class MetricsHandler(NoAccessLog):
     """Handle requests to the metrics
     """
 
