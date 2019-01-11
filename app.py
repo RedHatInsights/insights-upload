@@ -92,7 +92,7 @@ thread_pool_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 
 with open('VERSION', 'r') as f:
-    VERSION = f.read()
+    VERSION = f.readlines()[0]
 
 
 def split_content(content):
