@@ -20,7 +20,7 @@ from mock import patch
 
 client = AsyncHTTPClient()
 with open('VERSION', 'rb') as f:
-    VERSION = f.read()
+    VERSION = f.readlines()[0]
 
 
 class TestContentRegex(TestCase):
