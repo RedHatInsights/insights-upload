@@ -6,7 +6,6 @@ import os
 import re
 import base64
 import sys
-import configparser
 
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
@@ -38,10 +37,13 @@ else:
 logger = logging.getLogger('upload-service')
 
 # Valid topics config
-TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.ini')
-config = configparser.ConfigParser()
-config.read(TOPIC_CONFIG)
-VALID_TOPICS = [topic.split('.')[-1] for topic in config['default']['topics'].splitlines()]
+TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.json')
+VALID_TOPICS = []
+with open(TOPIC_CONFIG, 'r') as f:
+    topic_config = json.loads(f.read())
+
+for topic in topic_config:
+    VALID_TOPICS.append(topic['TOPIC_NAME'].split('.')[-1])
 
 # Set Storage driver to use
 storage_driver = os.getenv("STORAGE_DRIVER", "s3")

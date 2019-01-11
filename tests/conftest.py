@@ -18,12 +18,18 @@ from tests.fixtures import StopLoopException
 
 
 def prepare_app():
-    file_path = "/tmp/topics.ini"
+    file_path = "/tmp/topics.json"
     body = """
-    [default]
-    topics =
-        platform.upload.advisor
-        platform.upload.testareno
+    [{
+       "TOPIC_NAME": "platform.upload.advisor",
+       "PARTITIONS": 3,
+       "REPLICAS": 3
+     },
+     {
+       "TOPIC_NAME": "platform.upload.testareno",
+       "PARTITIONS": 3,
+       "REPLICAS": 3
+    }]
     """
     try:
         sh.rm(file_path)
@@ -33,7 +39,7 @@ def prepare_app():
     with open(file_path, "w") as fp:
         fp.write(body)
 
-    os.environ['TOPIC_CONFIG'] = '/tmp/topics.ini'
+    os.environ['TOPIC_CONFIG'] = '/tmp/topics.json'
 
     import app
 
