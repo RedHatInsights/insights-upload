@@ -26,14 +26,15 @@ from utils import mnm
 from logstash_formatter import LogstashFormatterV1
 
 # Logging
+LOGLEVEL = os.getenv("LOGLEVEL", "INFO")
 if any("KUBERNETES" in k for k in os.environ):
     handler = logging.StreamHandler(sys.stdout)
     handler.setFormatter(LogstashFormatterV1())
-    logging.root.setLevel(os.getenv("LOGLEVEL", "INFO"))
+    logging.root.setLevel(LOGLEVEL)
     logging.root.addHandler(handler)
 else:
     logging.basicConfig(
-        level=os.getenv("LOGLEVEL", "INFO"),
+        level=LOGLEVEL,
         format="%(threadName)s %(levelname)s %(name)s - %(message)s"
     )
 
@@ -97,7 +98,7 @@ thread_pool_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 
 with open('VERSION', 'r') as f:
-    VERSION = f.read()
+    VERSION = f.readlines()[0]
 
 
 def split_content(content):
@@ -223,7 +224,7 @@ async def handle_file(msgs):
         else:
             logger.info('payload_id [%s] no longer in quarantine', payload_id)
 
-
+            
 def post_to_inventory(identity, payload_id, values):
     headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
     post = values['metadata']
@@ -239,7 +240,20 @@ def post_to_inventory(identity, payload_id, values):
         logger.error("Unable to contact inventory")
 
 
-class RootHandler(tornado.web.RequestHandler):
+class NoAccessLog(tornado.web.RequestHandler):
+    """
+    A class to override tornado's logging mechanism.
+    Reduce noise in the logs via GET requests we don't care about.
+    """
+
+    def _log(self):
+        if LOGLEVEL == "DEBUG":
+            super()._log()
+        else:
+            pass
+
+
+class RootHandler(NoAccessLog):
     """Handles requests to root
     """
 
@@ -448,7 +462,7 @@ class VersionHandler(tornado.web.RequestHandler):
         self.write(response)
 
 
-class MetricsHandler(tornado.web.RequestHandler):
+class MetricsHandler(NoAccessLog):
     """Handle requests to the metrics
     """
 

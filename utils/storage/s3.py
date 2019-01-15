@@ -20,7 +20,7 @@ def write(data, dest, uuid):
     s3.upload_file(data, dest, uuid)
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
-                                            'Key': uuid}, ExpiresIn=100)
+                                            'Key': uuid}, ExpiresIn=3600)
     return url
 
 
