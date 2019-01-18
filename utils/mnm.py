@@ -22,7 +22,6 @@ uploads_too_large = Counter('uploads_too_large', 'The total amount of uploads gr
 uploads_unsupported_filetype = Counter('uploads_unsupported_filetype', 'The total amount of uploads not matching mimetype regex')
 
 # Prometheus Summaries
-uploads_s3_quarantine_seconds = Summary('uploads_s3_quarantine_seconds', 'Total seconds it takes to upload to s3 quarantine bucket')
 uploads_write_tarfile = Summary('uploads_write_tarfile_seconds', 'Total seconds it takes to write the tarfile upon upload')
 uploads_post_time = Summary('uploads_total_post_seconds', 'Total time it takes to post to upload service')
 uploads_handle_file_seconds = Summary('uploads_handle_file_seconds', 'Total time to handle files once validated by end service')

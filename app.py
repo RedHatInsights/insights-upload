@@ -275,7 +275,6 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
-    @prom_time(mnm.uploads_s3_quarantine_seconds)
     async def upload(self, filename, tracking_id, payload_id):
         """Write the payload to the configured storage
 
@@ -359,7 +358,7 @@ class UploadHandler(tornado.web.RequestHandler):
                 self.payload_id, topic, len(produce_queue)
             )
 
-    @prom_time(mnm.uploads_write_tarfile)
+    @mnm.uploads_write_tarfile.time()
     def write_data(self, body):
         """Writes the uploaded data to a tmp file in prepartion for writing to
            storage
