@@ -21,6 +21,7 @@ from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
 from utils import mnm
 from logstash_formatter import LogstashFormatterV1
+from prometheus_async.aio import time as prom_time
 
 # Logging
 LOGLEVEL = os.getenv("LOGLEVEL", "INFO")
@@ -155,6 +156,7 @@ def make_preprocessor(queue=None):
     return send_to_preprocessors
 
 
+@prom_time(mnm.uploads_handle_file_seconds)
 async def handle_file(msgs):
     """Determine which bucket to put a payload in based on the message
        returned from the validating service.
@@ -273,6 +275,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
+    @prom_time(mnm.uploads_s3_quarantine_seconds)
     async def upload(self, filename, tracking_id, payload_id):
         """Write the payload to the configured storage
 
@@ -356,6 +359,7 @@ class UploadHandler(tornado.web.RequestHandler):
                 self.payload_id, topic, len(produce_queue)
             )
 
+    @prom_time(mnm.uploads_write_tarfile)
     def write_data(self, body):
         """Writes the uploaded data to a tmp file in prepartion for writing to
            storage
@@ -381,6 +385,7 @@ class UploadHandler(tornado.web.RequestHandler):
         self.write(message)
         return (code, message)
 
+    @prom_time(mnm.uploads_post_time)
     async def post(self):
         """Handle POST requests to the upload endpoint
 
