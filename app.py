@@ -226,7 +226,7 @@ async def handle_file(msgs):
         else:
             logger.info('payload_id [%s] no longer in quarantine', payload_id)
 
-            
+
 def post_to_inventory(identity, payload_id, values):
     headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
     post = values['metadata']
