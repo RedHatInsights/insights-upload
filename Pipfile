@@ -17,7 +17,6 @@ pytest-cov = "*"
 [packages]
 tornado = "*"
 "boto3" = "*"
-requests = "*"
 botocore = "*"
 aiokafka = "*"
 logstash_formatter = "*"

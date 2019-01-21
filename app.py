@@ -6,6 +6,7 @@ import os
 import re
 import base64
 import sys
+import requests
 
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
@@ -14,8 +15,10 @@ from time import time
 
 import tornado.ioloop
 import tornado.web
+import tornado.httpclient
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
+from requests import ConnectionError
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
@@ -73,6 +76,8 @@ DUMMY_VALUES = {
 }
 
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
+
+INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
 
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
@@ -222,6 +227,21 @@ async def handle_file(msgs):
             logger.info('payload_id [%s] no longer in quarantine', payload_id)
 
 
+def post_to_inventory(identity, payload_id, values):
+    headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
+    post = values['metadata']
+    post['account'] = values['account']
+    try:
+        response = requests.post(INVENTORY_URL, json=post, headers=headers)
+        if response.status_code != 200 and response.status_code != 201:
+            logger.error('Failed to post to inventory: ' + response.text)
+        else:
+            logger.info('Payload posted to inventory: %s', payload_id)
+        return response.status_code
+    except ConnectionError:
+        logger.error("Unable to contact inventory")
+
+
 class NoAccessLog(tornado.web.RequestHandler):
     """
     A class to override tornado's logging mechanism.
@@ -345,6 +365,7 @@ class UploadHandler(tornado.web.RequestHandler):
         values['b64_identity'] = self.b64_identity
         if self.metadata:
             values['metadata'] = json.loads(self.metadata)
+            post_to_inventory(self.b64_identity, self.payload_id, values)
 
         url = await self.upload(self.filename, self.tracking_id, self.payload_id)
 
