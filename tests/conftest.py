@@ -11,10 +11,42 @@ import responses
 import sh
 from moto import mock_s3
 
-import app
+
 from utils import mnm
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 from tests.fixtures import StopLoopException
+
+
+def prepare_app():
+    file_path = "/tmp/topics.json"
+    body = """
+    [{
+       "TOPIC_NAME": "platform.upload.advisor",
+       "PARTITIONS": 3,
+       "REPLICAS": 3
+     },
+     {
+       "TOPIC_NAME": "platform.upload.testareno",
+       "PARTITIONS": 3,
+       "REPLICAS": 3
+    }]
+    """
+    try:
+        sh.rm(file_path)
+    except Exception:
+        pass
+
+    with open(file_path, "w") as fp:
+        fp.write(body)
+
+    os.environ['TOPIC_CONFIG'] = '/tmp/topics.json'
+
+    import app
+
+    return app
+
+
+app = prepare_app()
 
 
 @pytest.fixture()

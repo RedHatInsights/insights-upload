@@ -41,6 +41,16 @@ else:
 
 logger = logging.getLogger('upload-service')
 
+# Valid topics config
+VALID_TOPICS = []
+TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.json')
+with open(TOPIC_CONFIG, 'r') as f:
+    topic_config = json.loads(f.read())
+
+for topic in topic_config:
+    for name in topic['TOPIC_NAME'].split('.'):
+        VALID_TOPICS.append(name)
+
 # Set Storage driver to use
 storage_driver = os.getenv("STORAGE_DRIVER", "s3")
 storage = import_module("utils.storage.{}".format(storage_driver))
@@ -289,6 +299,9 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_unsupported_filetype.inc()
             logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
             return self.error(415, 'Unsupported Media Type')
+        if re.search(content_regex, self.payload_data['content_type']).group(1) not in VALID_TOPICS:
+            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
+            return self.error(415, 'Unsupported MIME type')
 
     def get(self):
         """Handles GET requests to the upload endpoint
