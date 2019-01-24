@@ -37,13 +37,14 @@ else:
 logger = logging.getLogger('upload-service')
 
 # Valid topics config
-TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.json')
 VALID_TOPICS = []
+TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.json')
 with open(TOPIC_CONFIG, 'r') as f:
     topic_config = json.loads(f.read())
 
 for topic in topic_config:
-    VALID_TOPICS.append(topic['TOPIC_NAME'].split('.')[-1])
+    for name in topic['TOPIC_NAME'].split('.'):
+        VALID_TOPICS.append(name)
 
 # Set Storage driver to use
 storage_driver = os.getenv("STORAGE_DRIVER", "s3")
