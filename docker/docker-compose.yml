@@ -26,6 +26,8 @@ services:
     image: upload-service:latest
     ports:
       - 8080:8888
+    volumes:
+      - ..:/usr/src/app:Z
     environment:
       - AWS_ACCESS_KEY_ID
       - AWS_SECRET_ACCESS_KEY
