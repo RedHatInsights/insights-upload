@@ -21,14 +21,14 @@ def prepare_app():
     file_path = "/tmp/topics.json"
     body = """
     [{
-       "TOPIC_NAME": "platform.upload.advisor",
-       "PARTITIONS": 3,
-       "REPLICAS": 3
+       'TOPIC_NAME': 'platform.upload.advisor',
+       'PARTITIONS': 3,
+       'REPLICAS': 3
      },
      {
-       "TOPIC_NAME": "platform.upload.testareno",
-       "PARTITIONS": 3,
-       "REPLICAS": 3
+       'TOPIC_NAME': 'platform.upload.testareno',
+       'PARTITIONS': 3,
+       'REPLICAS': 3
     }]
     """
     try:

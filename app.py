@@ -45,7 +45,8 @@ logger = logging.getLogger('upload-service')
 VALID_TOPICS = []
 TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.json')
 with open(TOPIC_CONFIG, 'r') as f:
-    topic_config = json.loads(f.read())
+    data = f.read().replace("'", '"')
+    topic_config = json.loads(data)
 
 for topic in topic_config:
     for name in topic['TOPIC_NAME'].split('.'):
