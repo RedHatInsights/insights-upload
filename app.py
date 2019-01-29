@@ -195,7 +195,7 @@ async def handle_file(msgs):
 
         # get the payload_id. Getting the hash is temporary until consumers update
         payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
-        result = data['validation']
+        result = data.get('validation')
 
         logger.info('processing message: payload [%s] - %s', payload_id, result)
 
