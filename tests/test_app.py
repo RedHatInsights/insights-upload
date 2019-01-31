@@ -20,8 +20,6 @@ from utils.storage import s3 as s3_storage
 from mock import patch
 
 client = AsyncHTTPClient()
-with open('VERSION', 'rb') as f:
-    VERSION = f.readlines()[0]
 
 
 def cleanup():
@@ -116,11 +114,12 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         self.assertEqual(response.code, 202)
 
+    @patch('app.BUILD_ID', 'f06bfd06040103caae5fde96b9f4c8be7f4d979a')
     @gen_test
     def test_version(self):
         response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/version'), method='GET')
         self.assertEqual(response.code, 200)
-        self.assertEqual(response.body, b'{"version": "%s"}' % VERSION)
+        self.assertEqual(response.body, b'{"commit": "f06bfd06040103caae5fde96b9f4c8be7f4d979a", "date": "2019-01-29T21:25:11Z"}')
 
     @gen_test
     def test_upload_post_file_too_large(self):
