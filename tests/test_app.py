@@ -114,7 +114,6 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         self.assertEqual(response.code, 202)
 
-    @patch('app.BUILD_ID', 'f06bfd06040103caae5fde96b9f4c8be7f4d979a')
     @gen_test
     def test_version(self):
         response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/version'), method='GET')
