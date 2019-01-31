@@ -97,7 +97,7 @@ INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 
-BUILD_ID = os.getenv('OPENSHIFT_BUILD_COMMIT')
+BUILD_ID = os.getenv('OPENSHIFT_BUILD_COMMIT', 'somemadeupvalue')
 
 kafka_consumer = AIOKafkaConsumer(VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop,
                                   bootstrap_servers=MQ, group_id=MQ_GROUP_ID)
