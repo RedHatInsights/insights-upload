@@ -119,6 +119,9 @@ def get_commit_date(url):
         return date
 
 
+BUILD_DATE = get_commit_date("https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/" + BUILD_ID)
+
+
 def split_content(content):
     """Split the content_type to find the service name
 
@@ -482,9 +485,8 @@ class VersionHandler(tornado.web.RequestHandler):
     def get(self):
         """Handle GET request to the `version` endpoint
         """
-        url = "https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/" + BUILD_ID
         response = {'commit': BUILD_ID,
-                    'date': get_commit_date(url)}
+                    'date': BUILD_DATE}
         self.write(response)
 
 
