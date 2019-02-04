@@ -309,11 +309,8 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_unsupported_filetype.inc()
             logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
             return self.error(415, 'Unsupported Media Type')
-        if re.search(content_regex, self.payload_data['content_type']):
-            if not DEVMODE and re.search(content_regex, self.payload_data['content_type']).group(1) not in VALID_TOPICS:
-                logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
-                return self.error(415, 'Unsupported MIME type')
-        else:
+        if not DEVMODE and get_service(self.payload_data['content_type']) not in VALID_TOPICS:
+            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
             return self.error(415, 'Unsupported MIME type')
 
     def get(self):
