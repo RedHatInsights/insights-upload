@@ -5,6 +5,7 @@ from botocore.exceptions import ClientError
 
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', None)
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', None)
+S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', None)
 
 # S3 buckets
 QUARANTINE = os.getenv('S3_QUARANTINE', 'insights-upload-quarantine')
@@ -12,6 +13,7 @@ PERM = os.getenv('S3_PERM', 'insights-upload-perm-test')
 REJECT = os.getenv('S3_REJECT', 'insights-upload-rejected')
 
 s3 = boto3.client('s3',
+                  endpoint_url=S3_ENDPOINT_URL,
                   aws_access_key_id=AWS_ACCESS_KEY_ID,
                   aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
 
