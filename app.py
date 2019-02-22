@@ -170,12 +170,12 @@ def make_preprocessor(queue=None):
             )
             try:
                 await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
-                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id)
+                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra={"payload_id": payload_id})
             except KafkaError:
                 queue.append(item)
                 logger.error(
                     "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
-                    topic, payload_id, len(queue)
+                    topic, payload_id, len(queue), extra={"payload_id": payload_id}
                 )
                 raise
     return send_to_preprocessors
@@ -206,7 +206,7 @@ async def handle_file(msgs):
         payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
         result = data.get('validation')
 
-        logger.info('processing message: payload [%s] - %s', payload_id, result)
+        logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"payload_id": payload_id})
 
         if storage.ls(storage.QUARANTINE, payload_id)['ResponseMetadata']['HTTPStatusCode'] == 200:
             if result.lower() == 'success':
@@ -232,7 +232,7 @@ async def handle_file(msgs):
                 produce_queue.append(data)
                 logger.info(
                     "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
-                    data['topic'], payload_id, len(produce_queue)
+                    data['topic'], payload_id, len(produce_queue), extra={"payload_id": payload_id}
                 )
                 logger.debug("payload_id [%s] data: %s", payload_id, data)
             elif result.lower() == 'failure':
@@ -244,7 +244,7 @@ async def handle_file(msgs):
             else:
                 logger.info('Unrecognized result: %s', result.lower())
         else:
-            logger.info('payload_id [%s] no longer in quarantine', payload_id)
+            logger.info('payload_id [%s] no longer in quarantine', payload_id, extra={"payload_id": payload_id})
 
 
 def post_to_inventory(identity, payload_id, values):
@@ -254,12 +254,12 @@ def post_to_inventory(identity, payload_id, values):
     try:
         response = requests.post(INVENTORY_URL, json=post, headers=headers)
         if response.status_code != 200 and response.status_code != 201:
-            logger.error('Failed to post to inventory: ' + response.text)
+            logger.error('Failed to post to inventory: ' + response.text, extra={"payload_id": payload_id})
         else:
-            logger.info('Payload posted to inventory: %s', payload_id)
+            logger.info('Payload posted to inventory: %s', payload_id, extra={"payload_id": payload_id})
         return response.status_code
     except ConnectionError:
-        logger.error("Unable to contact inventory")
+        logger.error("Unable to contact inventory", extra={"payload_id": payload_id})
 
 
 class NoAccessLog(tornado.web.RequestHandler):
@@ -307,10 +307,10 @@ class UploadHandler(tornado.web.RequestHandler):
             get_service(self.payload_data['content_type'])
         except Exception:
             mnm.uploads_unsupported_filetype.inc()
-            logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
+            logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"payload_id": self.payload_id})
             return self.error(415, 'Unsupported Media Type')
         if not DEVMODE and get_service(self.payload_data['content_type']) not in VALID_TOPICS:
-            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
+            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"payload_id": self.payload_id})
             return self.error(415, 'Unsupported MIME type')
 
     def get(self):
@@ -335,7 +335,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
 
         upload_start = time()
-        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id)
+        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"payload_id": payload_id})
 
         try:
             url = await IOLoop.current().run_in_executor(
@@ -353,7 +353,7 @@ class UploadHandler(tornado.web.RequestHandler):
             elapsed = time() - upload_start
             logger.exception(
                 "Exception hit uploading: tracking id [%s] payload_id [%s] elapsed [%fsec]",
-                tracking_id, payload_id, elapsed
+                tracking_id, payload_id, elapsed, extra={"payload_id": payload_id}
             )
         finally:
             await IOLoop.current().run_in_executor(None, os.remove, filename)
@@ -399,7 +399,7 @@ class UploadHandler(tornado.web.RequestHandler):
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
-                self.payload_id, topic, len(produce_queue)
+                self.payload_id, topic, len(produce_queue), extra={"payload_id": self.payload_id}
             )
 
     @mnm.uploads_write_tarfile.time()
