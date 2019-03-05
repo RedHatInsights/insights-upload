@@ -1,7 +1,11 @@
 import boto3
 import os
+import time
+
+from utils import mnm
 
 from botocore.exceptions import ClientError
+
 
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', None)
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', None)
@@ -18,6 +22,7 @@ s3 = boto3.client('s3',
                   aws_secret_access_key=AWS_SECRET_ACCESS_KEY)
 
 
+@mnm.uploads_s3_write_seconds.time()
 def write(data, dest, uuid):
     s3.upload_file(data, dest, uuid)
     url = s3.generate_presigned_url('get_object',
@@ -26,6 +31,7 @@ def write(data, dest, uuid):
     return url
 
 
+@mnm.uploads_s3_copy_seconds.time()
 def copy(src, dest, uuid):
     copy_src = {'Bucket': src,
                 'Key': uuid}
@@ -37,6 +43,7 @@ def copy(src, dest, uuid):
     return url
 
 
+@mnm.uploads_s3_ls_seconds.time()
 def ls(src, uuid):
     try:
         result = s3.head_object(Bucket=src, Key=uuid)

@@ -26,6 +26,11 @@ uploads_write_tarfile = Summary('uploads_write_tarfile_seconds', 'Total seconds 
 uploads_post_time = Summary('uploads_total_post_seconds', 'Total time it takes to post to upload service')
 uploads_handle_file_seconds = Summary('uploads_handle_file_seconds', 'Total time to handle files once validated by end service')
 
+# Non Async Functions
+uploads_s3_copy_seconds = Summary('uploads_s3_copy_seconds', 'Total time to copy a file from bucket to bucket')
+uploads_s3_write_seconds = Summary('uploads_s3_write_seconds', 'Total time to write to a bucket')
+uploads_s3_ls_seconds = Summary('uploads_s3_ls_seconds', 'Total time to list a file in S3')
+
 logger = logging.getLogger(__name__)
 
 # Get the namespace to tag for influxdb.
