@@ -1,6 +1,5 @@
 import boto3
 import os
-import time
 
 from utils import mnm
 

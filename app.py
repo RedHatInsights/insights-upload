@@ -114,9 +114,9 @@ thread_pool_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 
 def get_commit_date(url):
-        response = requests.get(url)
-        date = response.json()['committer']['date']
-        return date
+    response = requests.get(url)
+    date = response.json()['committer']['date']
+    return date
 
 
 BUILD_DATE = get_commit_date("https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/" + BUILD_ID)
