@@ -441,7 +441,7 @@ class UploadHandler(tornado.web.RequestHandler):
 
         if not self.request.files.get('upload') and not self.request.files.get('file'):
             return self.error(415, "Upload field not found")
-        
+
         request_id = self.request.headers.get('x-rh-insights-request-id')
         self.payload_id = request_id if request_id else uuid.uuid4().hex
 
