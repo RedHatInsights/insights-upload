@@ -196,7 +196,7 @@ class TestInventoryPost(object):
                       json={"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, status=200)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
-        assert method_response is 200
+        assert method_response == 200
         assert len(responses.calls) == 1
         assert responses.calls[0].response.text == '{"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}'
 
@@ -208,7 +208,7 @@ class TestInventoryPost(object):
                       json={"error message": "boop"}, status=400)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
-        assert method_response is 400
+        assert method_response == 400
         assert len(responses.calls) == 1
         assert responses.calls[0].response.text == '{"error message": "boop"}'
 
