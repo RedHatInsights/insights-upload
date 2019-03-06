@@ -114,13 +114,16 @@ produce_queue = collections.deque([], 999)
 thread_pool_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 
-def get_commit_date(url):
-    response = requests.get(url)
+def get_commit_date(commit_id):
+    BASE_URL = "https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/" 
+    response = requests.get(BASE_URL + commit_id)
     date = response.json()['committer']['date']
     return date
 
-
-BUILD_DATE = get_commit_date("https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/" + BUILD_ID)
+if DEVMODE:
+    BUILD_DATE = 'devmode'
+else:
+    BUILD_DATE = get_commit_date(BUILD_ID)
 
 
 def split_content(content):
