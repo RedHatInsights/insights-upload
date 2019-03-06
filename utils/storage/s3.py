@@ -38,7 +38,7 @@ def copy(src, dest, uuid):
     s3.delete_object(Bucket=src, Key=uuid)
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
-                                            'Key': uuid})
+                                            'Key': uuid}, ExpiresIn=86400)
     return url
 
 
