@@ -120,6 +120,7 @@ def get_commit_date(commit_id):
     date = response.json()['committer']['date']
     return date
 
+
 if DEVMODE:
     BUILD_DATE = 'devmode'
 else:
