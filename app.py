@@ -114,13 +114,17 @@ produce_queue = collections.deque([], 999)
 thread_pool_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
 
 
-def get_commit_date(url):
-    response = requests.get(url)
+def get_commit_date(commit_id):
+    BASE_URL = "https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/"
+    response = requests.get(BASE_URL + commit_id)
     date = response.json()['committer']['date']
     return date
 
 
-BUILD_DATE = get_commit_date("https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/" + BUILD_ID)
+if DEVMODE:
+    BUILD_DATE = 'devmode'
+else:
+    BUILD_DATE = get_commit_date(BUILD_ID)
 
 
 def split_content(content):
@@ -257,7 +261,9 @@ def post_to_inventory(identity, payload_id, values):
         if response.status_code != 200 and response.status_code != 201:
             logger.error('Failed to post to inventory: ' + response.text, extra={"payload_id": payload_id})
         else:
-            logger.info('Payload posted to inventory: %s', payload_id, extra={"payload_id": payload_id})
+            inv_id = response.json().get('id')
+            logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"payload_id": payload_id,
+                                                                                                "id": inv_id})
         return response.status_code
     except ConnectionError:
         logger.error("Unable to contact inventory", extra={"payload_id": payload_id})
