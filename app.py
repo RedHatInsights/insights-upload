@@ -259,9 +259,10 @@ def post_to_inventory(identity, payload_id, values):
     try:
         response = requests.post(INVENTORY_URL, json=post, headers=headers)
         if response.status_code != 200 and response.status_code != 201:
-            logger.error('Failed to post to inventory: ' + response.text, extra={"payload_id": payload_id})
+            error = response.json()['data'][0].get('detail')
+            logger.error('Failed to post to inventory: ' + error, extra={"payload_id": payload_id})
         else:
-            inv_id = response.json().get('id')
+            inv_id = response.json()['data'][0].get('id')
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"payload_id": payload_id,
                                                                                                 "id": inv_id})
         return response.status_code
