@@ -7,6 +7,7 @@ import re
 import base64
 import sys
 import requests
+import uuid
 
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
@@ -441,7 +442,8 @@ class UploadHandler(tornado.web.RequestHandler):
         if not self.request.files.get('upload') and not self.request.files.get('file'):
             return self.error(415, "Upload field not found")
 
-        self.payload_id = self.request.headers.get('x-rh-insights-request-id')
+        request_id = self.request.headers.get('x-rh-insights-request-id')
+        self.payload_id = request_id if request_id else uuid.uuid4().hex
 
         # TODO: pull this out once no one is using the upload field anymore
         self.payload_data = self.request.files.get('upload')[0] if self.request.files.get('upload') else self.request.files.get('file')[0]
