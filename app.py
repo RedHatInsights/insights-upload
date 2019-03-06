@@ -257,7 +257,9 @@ def post_to_inventory(identity, payload_id, values):
         if response.status_code != 200 and response.status_code != 201:
             logger.error('Failed to post to inventory: ' + response.text, extra={"payload_id": payload_id})
         else:
-            logger.info('Payload posted to inventory: %s', payload_id, extra={"payload_id": payload_id})
+            inv_id = response.json().get('id')
+            logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"payload_id": payload_id,
+                                                                                                "id": inv_id})
         return response.status_code
     except ConnectionError:
         logger.error("Unable to contact inventory", extra={"payload_id": payload_id})
