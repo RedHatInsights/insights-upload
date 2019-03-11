@@ -40,7 +40,7 @@ def prepare_app():
         fp.write(body)
 
     os.environ['TOPIC_CONFIG'] = '/tmp/topics.json'
-    os.environ['OPENSHIFT_BUILD_COMMIT'] = 'f06bfd06040103caae5fde96b9f4c8be7f4d979a'
+    os.environ['OPENSHIFT_BUILD_COMMIT'] = '8d06f664a88253c361e61af5a4fa2ac527bb5f46'
 
     import app
 

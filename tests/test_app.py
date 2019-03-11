@@ -118,7 +118,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
     def test_version(self):
         response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/version'), method='GET')
         self.assertEqual(response.code, 200)
-        self.assertEqual(response.body, b'{"commit": "f06bfd06040103caae5fde96b9f4c8be7f4d979a", "date": "2019-01-29T21:25:11Z"}')
+        self.assertEqual(response.body, b'{"commit": "8d06f664a88253c361e61af5a4fa2ac527bb5f46", "date": "2019-03-11T19:06:36Z"}')
 
     @gen_test
     def test_upload_post_file_too_large(self):
