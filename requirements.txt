@@ -5,8 +5,8 @@ atomicwrites==1.2.1
 attrs==18.2.0
 aws-xray-sdk==0.95
 boto==2.49.0
-boto3==1.9.41
-botocore==1.12.41
+boto3==1.9.91
+botocore==1.12.91
 certifi==2018.10.15
 cffi==1.11.5
 chardet==3.0.4
@@ -51,7 +51,6 @@ pytz==2018.7
 PyYAML==3.13
 requests==2.20.1
 responses==0.10.3
-s3transfer==0.1.13
 sh==1.12.14
 six==1.11.0
 tornado==5.1.1
@@ -63,4 +62,4 @@ wrapt==1.10.11
 xmltodict==0.11.0
 kafkahelpers
 prometheus_async
-aiobotocore
+aioboto3
