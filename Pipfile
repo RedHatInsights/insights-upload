@@ -16,13 +16,12 @@ pytest-cov = "*"
 
 [packages]
 tornado = "*"
-"boto3" = "*"
-botocore = "*"
 aiokafka = "*"
 logstash_formatter = "*"
 prometheus-client = ">=0.5.0"
 kafkahelpers = "*"
 prometheus-async = "*"
+aiobotocore = "*"
 
 [requires]
 python_version = "3.6"
