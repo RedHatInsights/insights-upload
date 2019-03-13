@@ -40,7 +40,7 @@ def prepare_app():
         fp.write(body)
 
     os.environ['TOPIC_CONFIG'] = '/tmp/topics.json'
-    os.environ['OPENSHIFT_BUILD_COMMIT'] = '8d06f664a88253c361e61af5a4fa2ac527bb5f46'
+    os.environ['DEV'] = 'True'
 
     import app
 
@@ -171,11 +171,11 @@ def produce_queue_mocked():
 
 
 @pytest.fixture
-def broker_stage_messages(s3_mocked, produce_queue_mocked):
-    def set_url(_file, service, avoid_produce_queue=False, validation='success'):
+async def broker_stage_messages(s3_mocked, produce_queue_mocked):
+    async def set_url(_file, service, avoid_produce_queue=False, validation='success'):
         file_name = uuid.uuid4().hex
 
-        file_path = s3_storage.write(
+        file_path = await s3_storage.write(
             _file,
             s3_storage.QUARANTINE,
             file_name
@@ -188,7 +188,7 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
             'payload_id': file_name,
             'size': 100,
             'service': service,
-            'url': file_path
+            'url': await file_path
         }
 
         if not avoid_produce_queue:

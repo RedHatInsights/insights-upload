@@ -22,10 +22,6 @@ from mock import patch
 client = AsyncHTTPClient()
 
 
-def cleanup():
-    sh.rm(app.TOPIC_CONFIG)
-
-
 class TestContentRegex(TestCase):
     """
     Test the content MIME type regex described in IPP 1.
@@ -216,8 +212,9 @@ class TestInventoryPost(object):
 class TestProducerAndConsumer:
 
     @staticmethod
-    def _create_message_s3(_file, _stage_message, avoid_produce_queue=False, validation='success',
-                           topic='platform.upload.validation'):
+    @pytest.mark.asyncio
+    async def _create_message_s3(_file, _stage_message, avoid_produce_queue=False, validation='success',
+                                 topic='platform.upload.validation'):
         return _stage_message(_file, topic, avoid_produce_queue, validation)
 
     @asyncio.coroutine
@@ -227,9 +224,10 @@ class TestProducerAndConsumer:
 
         assert str(e.value) == exc_message
 
-    def test_producer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+    @pytest.mark.asyncio
+    async def test_producer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
         total_messages = 4
-        [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
+        [await self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
 
         with FakeMQ() as mq:
             client = ReconnectingClient(mq, "producer")
@@ -244,7 +242,8 @@ class TestProducerAndConsumer:
             assert mq.disconnect_in_operation_called is False
             assert mq.trying_to_connect_failures_calls == 0
 
-    def test_consumer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
+    @pytest.mark.asyncio
+    async def test_consumer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
         topic = 'platform.upload.validation'
@@ -254,10 +253,10 @@ class TestProducerAndConsumer:
             consumer = client.get_callback(app.handle_validation)
 
             for _ in range(total_messages):
-                message = self._create_message_s3(
+                message = await self._create_message_s3(
                     local_file, broker_stage_messages, avoid_produce_queue=True, topic=topic
                 )
-                mq.send_and_wait(topic, json.dumps(message).encode('utf-8'), True)
+                mq.send_and_wait(topic, json.dumps(await message).encode('utf-8'), True)
                 produced_messages.append(message)
 
             for m in produced_messages:
@@ -398,6 +397,3 @@ class TestProducerAndConsumer:
             assert mq.disconnect_in_operation_called is True
             assert mq.trying_to_connect_failures_calls == 1
             assert len(app.produce_queue) == 4
-
-
-cleanup()
