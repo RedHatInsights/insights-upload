@@ -118,7 +118,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
     def test_version(self):
         response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/version'), method='GET')
         self.assertEqual(response.code, 200)
-        self.assertEqual(response.body, b'{"commit": "f06bfd06040103caae5fde96b9f4c8be7f4d979a", "date": "2019-01-29T21:25:11Z"}')
+        self.assertEqual(response.body, b'{"commit": "8d06f664a88253c361e61af5a4fa2ac527bb5f46", "date": "2019-03-11T19:06:36Z"}')
 
     @gen_test
     def test_upload_post_file_too_large(self):
@@ -193,24 +193,24 @@ class TestInventoryPost(object):
     def test_post_to_inventory_success(self):
         values = {"account": "12345", "metadata": {"some_key": "some_value"}}
         responses.add(responses.POST, app.INVENTORY_URL,
-                      json={"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, status=200)
+                      json={"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}, status=207)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
-        assert method_response == 200
+        assert method_response == 207
         assert len(responses.calls) == 1
-        assert responses.calls[0].response.text == '{"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}'
+        assert responses.calls[0].response.text == '{"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}'
 
     @responses.activate
     @patch("app.INVENTORY_URL", "http://fakeinventory.com/r/insights/platform/inventory/api/v1/hosts")
     def test_post_to_inventory_fail(self):
         values = {"account": "12345", "metadata": {"bad_key": "bad_value"}}
         responses.add(responses.POST, app.INVENTORY_URL,
-                      json={"error message": "boop"}, status=400)
+                      json={"data": [{"detail": "boop", "status": 400}]}, status=207)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
-        assert method_response == 400
+        assert method_response == 207
         assert len(responses.calls) == 1
-        assert responses.calls[0].response.text == '{"error message": "boop"}'
+        assert responses.calls[0].response.text == '{"data": [{"detail": "boop", "status": 400}]}'
 
 
 class TestProducerAndConsumer:
