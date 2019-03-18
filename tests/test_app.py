@@ -212,6 +212,12 @@ class TestInventoryPost(object):
         assert len(responses.calls) == 1
         assert responses.calls[0].response.text == '{"data": [{"detail": "boop", "status": 400}]}'
 
+    def test_strip_empty_key_before_post_to_inventory(self):
+        values = {"account": "12345", "metadata": {"empty_key": [], "non_empty_key": "non_empty_value"}}
+        stripped_metadata = app.strip_empty_facts(values["metadata"])
+        
+        assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
+
 
 class TestProducerAndConsumer:
 

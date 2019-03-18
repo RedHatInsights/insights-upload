@@ -140,6 +140,17 @@ def split_content(content):
     return service
 
 
+def strip_empty_facts(facts):
+    """
+    Empy values need to be stripped from metadata prior to posting to inventory.
+    """
+    defined_facts = {}
+    for fact in facts:
+        if facts[fact]:
+            defined_facts.update({fact: facts[fact]})
+    return defined_facts
+
+
 def get_service(content_type):
     """
     Returns the service that content_type maps to.
@@ -254,7 +265,7 @@ async def handle_file(msgs):
 
 def post_to_inventory(identity, payload_id, values):
     headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
-    post = values['metadata']
+    post = strip_empty_facts(values['metadata'])
     post['account'] = values['account']
     try:
         response = requests.post(INVENTORY_URL, json=[post], headers=headers)
