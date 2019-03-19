@@ -1,4 +1,6 @@
 aiokafka==0.4.3
+apispec==1.1.0
+apispec-webframeworks==0.3.0
 asn1crypto==0.24.0
 astroid==2.0.4
 atomicwrites==1.2.1
