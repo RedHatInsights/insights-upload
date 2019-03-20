@@ -267,7 +267,10 @@ async def handle_file(msgs):
 
 
 def post_to_inventory(identity, payload_id, values):
-    headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
+    headers = {'x-rh-identity': identity,
+               'Content-Type': 'application/json',
+               'x-rh-insights-request-id': payload_id,
+               }
     post = prepare_facts_for_inventory(values['metadata'])
     post['account'] = values['account']
     try:
