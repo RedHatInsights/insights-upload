@@ -74,7 +74,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         # Build HTTP Request so that Tornado can recognize and use the payload test
         request = requests.Request(
-            url="http://localhost:8888/r/insights/platform/upload/api/v1/upload", data={},
+            url="http://localhost:8888/api/ingress/v1/upload", data={},
             files={file_field_name: (file_name, io.BytesIO(os.urandom(file_size)), mime_type)} if file_name else None,
         )
         request.headers["x-rh-insights-request-id"] = "test"
@@ -86,27 +86,27 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
     @gen_test
     def test_root_get(self):
-        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload'), method='GET')
+        response = yield self.http_client.fetch(self.get_url('/api/ingress'), method='GET')
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body, b'boop')
-        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload'), method='OPTIONS')
+        response = yield self.http_client.fetch(self.get_url('/api/ingress'), method='OPTIONS')
         self.assertEqual(response.headers['Allow'], 'GET, HEAD, OPTIONS')
 
     @gen_test
     def test_upload_get(self):
-        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/upload'), method='GET')
+        response = yield self.http_client.fetch(self.get_url('/api/ingress/v1/upload'), method='GET')
         self.assertEqual(response.body, b"Accepted Content-Types: gzipped tarfile, zip file")
 
     @gen_test
     def test_upload_allowed_methods(self):
-        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/upload'), method='OPTIONS')
+        response = yield self.http_client.fetch(self.get_url('/api/ingress/v1/upload'), method='OPTIONS')
         self.assertEqual(response.headers['Allow'], 'GET, POST, HEAD, OPTIONS')
 
     @gen_test
     def test_upload_post(self):
         request_context = self.prepare_request_context(100, 'payload.tar.gz')
         response = yield self.http_client.fetch(
-            self.get_url('/r/insights/platform/upload/api/v1/upload'),
+            self.get_url('/api/ingress/v1/upload'),
             method='POST',
             body=request_context.body,
             headers=request_context.headers
@@ -116,7 +116,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
     @gen_test
     def test_version(self):
-        response = yield self.http_client.fetch(self.get_url('/r/insights/platform/upload/api/v1/version'), method='GET')
+        response = yield self.http_client.fetch(self.get_url('/api/ingress/v1/version'), method='GET')
         self.assertEqual(response.code, 200)
         self.assertEqual(response.body, b'{"commit": "8d06f664a88253c361e61af5a4fa2ac527bb5f46", "date": "2019-03-11T19:06:36Z"}')
 
@@ -126,7 +126,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
-                self.get_url('/r/insights/platform/upload/api/v1/upload'),
+                self.get_url('/api/ingress/v1/upload'),
                 method='POST',
                 body=request_context.body,
                 headers=request_context.headers
@@ -146,7 +146,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
-                self.get_url('/r/insights/platform/upload/api/v1/upload'),
+                self.get_url('/api/ingress/v1/upload'),
                 method='POST',
                 body=request_context.body,
                 headers=request_context.headers
@@ -161,7 +161,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
-                self.get_url('/r/insights/platform/upload/api/v1/upload'),
+                self.get_url('/api/ingress/v1/upload'),
                 method='POST',
                 body=request_context.body,
                 headers=request_context.headers
@@ -176,7 +176,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
-                self.get_url('/r/insights/platform/upload/api/v1/upload'),
+                self.get_url('/api/ingress/v1/upload'),
                 method='POST',
                 body=request_context.body,
                 headers=request_context.headers
@@ -189,7 +189,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 class TestInventoryPost(object):
 
     @responses.activate
-    @patch("app.INVENTORY_URL", "http://fakeinventory.com/r/insights/platform/inventory/api/v1/hosts")
+    @patch("app.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
     def test_post_to_inventory_success(self):
         values = {"account": "12345", "metadata": {"some_key": "some_value"}}
         responses.add(responses.POST, app.INVENTORY_URL,
@@ -201,7 +201,7 @@ class TestInventoryPost(object):
         assert responses.calls[0].response.text == '{"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}'
 
     @responses.activate
-    @patch("app.INVENTORY_URL", "http://fakeinventory.com/r/insights/platform/inventory/api/v1/hosts")
+    @patch("app.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
     def test_post_to_inventory_fail(self):
         values = {"account": "12345", "metadata": {"bad_key": "bad_value"}}
         responses.add(responses.POST, app.INVENTORY_URL,

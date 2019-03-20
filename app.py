@@ -97,6 +97,11 @@ VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 
 INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
 
+PATH_PREFIX = os.getenv('PATH_PREFIX', '/api/')
+APP_NAME = os.getenv('APP_NAME', 'ingress')
+
+API_PREFIX = PATH_PREFIX + APP_NAME
+
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
@@ -643,10 +648,9 @@ class SpecHandler(tornado.web.RequestHandler):
 
 
 endpoints = [
-    (r"/r/insights/platform/upload", RootHandler),
-    (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
-    (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
-    (r"/r/insights/platform/upload/api/v1/openapi.json", SpecHandler),
+    (API_PREFIX, RootHandler),
+    (API_PREFIX + "/v1/version", VersionHandler),
+    (API_PREFIX + "/v1/upload", UploadHandler),
     (r"/metrics", MetricsHandler)
 ]
 
