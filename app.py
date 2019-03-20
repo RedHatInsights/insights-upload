@@ -550,7 +550,7 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             mnm.uploads_valid.inc()
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
-            self.metadata = self.request.body_arguments['metadata'][0].decode('utf-8') if self.request.body_arguments.get('metadata') else None
+            self.metadata = self.__get_metadata_from_request()
             self.service = get_service(self.payload_data['content_type'])
             if self.request.headers.get('x-rh-identity'):
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
@@ -582,6 +582,12 @@ class UploadHandler(tornado.web.RequestHandler):
                             type: string
         """
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
+
+    def __get_metadata_from_request(self):
+        if self.request.files.get('metadata'):
+            return self.request.files['metadata'][0]['body'].decode('utf-8')
+        elif self.request.body_arguments.get('metadata'):
+            return self.request.body_arguments['metadata'][0].decode('utf-8')
 
 
 class VersionHandler(tornado.web.RequestHandler):
