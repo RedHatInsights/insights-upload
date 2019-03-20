@@ -159,6 +159,17 @@ def split_content(content):
     return service
 
 
+def strip_empty_facts(facts):
+    """
+    Empy values need to be stripped from metadata prior to posting to inventory.
+    """
+    defined_facts = {}
+    for fact in facts:
+        if facts[fact]:
+            defined_facts.update({fact: facts[fact]})
+    return defined_facts
+
+
 def get_service(content_type):
     """
     Returns the service that content_type maps to.
@@ -273,21 +284,23 @@ async def handle_file(msgs):
 
 def post_to_inventory(identity, payload_id, values):
     headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
-    post = values['metadata']
+    post = strip_empty_facts(values['metadata'])
     post['account'] = values['account']
     try:
         response = requests.post(INVENTORY_URL, json=[post], headers=headers)
         if response.status_code != 207:
             error = response.json().get('detail')
             logger.error('Failed to post to inventory: %s', error)
+            return None
         elif response.json()['data'][0]['status'] != 200 and response.json()['data'][0]['status'] != 201:
             error = response.json()['data'][0].get('detail')
             logger.error('Failed to post to inventory: ' + error, extra={"payload_id": payload_id})
+            return None
         else:
             inv_id = response.json()['data'][0]['host']['id']
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"payload_id": payload_id,
                                                                                                 "id": inv_id})
-        return response.status_code
+            return inv_id
     except ConnectionError:
         logger.error("Unable to contact inventory", extra={"payload_id": payload_id})
 
@@ -448,13 +461,13 @@ class UploadHandler(tornado.web.RequestHandler):
         values['b64_identity'] = self.b64_identity
         if self.metadata:
             values['metadata'] = json.loads(self.metadata)
-            post_to_inventory(self.b64_identity, self.payload_id, values)
+            values['id'] = post_to_inventory(self.b64_identity, self.payload_id, values)
+            del values['metadata']
 
         url = await self.upload(self.filename, self.tracking_id, self.payload_id)
 
         if url:
             values['url'] = url
-
             topic = 'platform.upload.' + self.service
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(

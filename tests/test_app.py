@@ -196,7 +196,7 @@ class TestInventoryPost(object):
                       json={"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}, status=207)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
-        assert method_response == 207
+        assert method_response == "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"
         assert len(responses.calls) == 1
         assert responses.calls[0].response.text == '{"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}'
 
@@ -208,9 +208,15 @@ class TestInventoryPost(object):
                       json={"data": [{"detail": "boop", "status": 400}]}, status=207)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
-        assert method_response == 207
+        assert method_response is None
         assert len(responses.calls) == 1
         assert responses.calls[0].response.text == '{"data": [{"detail": "boop", "status": 400}]}'
+
+    def test_strip_empty_key_before_post_to_inventory(self):
+        values = {"account": "12345", "metadata": {"empty_key": [], "non_empty_key": "non_empty_value"}}
+        stripped_metadata = app.strip_empty_facts(values["metadata"])
+
+        assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
 
 
 class TestProducerAndConsumer:
