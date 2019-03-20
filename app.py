@@ -617,6 +617,7 @@ class MetricsHandler(NoAccessLog):
         """
         self.write(mnm.generate_latest())
 
+
 class SpecHandler(tornado.web.RequestHandler):
     """Handle requests for service's API Spec
     """
@@ -631,6 +632,7 @@ class SpecHandler(tornado.web.RequestHandler):
         """
         response = spec.to_dict()
         self.write(json.dumps(response))
+
 
 endpoints = [
     (r"/r/insights/platform/upload", RootHandler),
