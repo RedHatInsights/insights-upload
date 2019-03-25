@@ -294,10 +294,12 @@ def post_to_inventory(identity, payload_id, values):
         if response.status_code != 207:
             error = response.json().get('detail')
             logger.error('Failed to post to inventory: %s', error)
+            logger.debug('Host data that failed to post: %s' % post)
             return None
         elif response.json()['data'][0]['status'] != 200 and response.json()['data'][0]['status'] != 201:
             error = response.json()['data'][0].get('detail')
             logger.error('Failed to post to inventory: ' + error, extra={"payload_id": payload_id})
+            logger.debug('Host data that failed to post: %s' % post)
             return None
         else:
             inv_id = response.json()['data'][0]['host']['id']
