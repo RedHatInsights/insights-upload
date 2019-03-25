@@ -631,7 +631,7 @@ class SpecHandler(tornado.web.RequestHandler):
                 description: OK
         """
         response = spec.to_dict()
-        self.write(json.dumps(response))
+        self.write(response)
 
 
 endpoints = [
