@@ -140,14 +140,17 @@ def split_content(content):
     return service
 
 
-def strip_empty_facts(facts):
+def prepare_facts_for_inventory(facts):
     """
-    Empy values need to be stripped from metadata prior to posting to inventory.
+    Empty values need to be stripped from metadata prior to posting to inventory.
+    Display_name must be greater than 1 and less than 200 characters.
     """
     defined_facts = {}
     for fact in facts:
         if facts[fact]:
             defined_facts.update({fact: facts[fact]})
+    if 'display_name' in defined_facts and len(defined_facts['display_name']) not in range(2, 200):
+        defined_facts.pop('display_name')
     return defined_facts
 
 
@@ -265,7 +268,7 @@ async def handle_file(msgs):
 
 def post_to_inventory(identity, payload_id, values):
     headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
-    post = strip_empty_facts(values['metadata'])
+    post = prepare_facts_for_inventory(values['metadata'])
     post['account'] = values['account']
     try:
         response = requests.post(INVENTORY_URL, json=[post], headers=headers)
