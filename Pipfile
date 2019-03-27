@@ -23,6 +23,8 @@ logstash_formatter = "*"
 prometheus-client = ">=0.5.0"
 kafkahelpers = "*"
 prometheus-async = "*"
+requests = "*"
+attrs = "*"
 
 [requires]
 python_version = "3.6"

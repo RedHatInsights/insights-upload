@@ -29,7 +29,7 @@ paths:
             Allow:
               type: string
               description: 'GET, HEAD, OPTIONS'
-  /api/v1/upload:
+  /v1/upload:
     get:
       description: |
         Display accepted content-type
@@ -58,7 +58,7 @@ paths:
             Allow:
               type: string
               description: 'GET, POST, HEAD, OPTIONS'
-  /api/v1/version:
+  /v1/version:
     get:
       description: |
         Display API version
