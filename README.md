@@ -217,7 +217,7 @@ Upload a file to see if the system is working properly. Any file will work in te
 as long as the `type` field is set properly. Use the `README.md` file in this repo if
 you'd like.
 
-    curl -vvvv -H "x-rh-identity: <your base64 string>" -F "upload=@test-archive.tar.gz;type=application/vnd.redhat.testareno.something+tgz" -H "x-rh-insights-request-id: 52df9f748eabcfea" localhost:8080/r/insights/platform/upload/api/v1/upload
+    curl -vvvv -H "x-rh-identity: <your base64 string>" -F "upload=@test-archive.tar.gz;type=application/vnd.redhat.testareno.something+tgz" -H "x-rh-insights-request-id: 52df9f748eabcfea" localhost:8080/api/ingress/v1/upload
 
 If you’re running the upload service app directly and not in Docker, use port 8888 instead
 of 8080 in the aforementioned command.
