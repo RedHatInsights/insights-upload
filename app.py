@@ -648,7 +648,7 @@ endpoints = [
     (API_PREFIX, RootHandler),
     (API_PREFIX + "/v1/version", VersionHandler),
     (API_PREFIX + "/v1/upload", UploadHandler),
-    (API_PREFIX + "v1/openapi.json", SpecHandler),
+    (API_PREFIX + "/v1/openapi.json", SpecHandler),
     (r"/metrics", MetricsHandler)
 ]
 
