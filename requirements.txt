@@ -1,4 +1,6 @@
-aiokafka==0.4.3
+aiokafka==0.5.0
+apispec==1.1.0
+apispec-webframeworks==0.3.0
 asn1crypto==0.24.0
 astroid==2.0.4
 atomicwrites==1.2.1
@@ -48,7 +50,7 @@ pytest-metadata==1.7.0
 python-dateutil==2.7.5
 python-jose==2.0.2
 pytz==2018.7
-PyYAML==3.13
+PyYAML>=4.2b2
 requests==2.20.1
 responses==0.10.3
 s3transfer==0.1.13
