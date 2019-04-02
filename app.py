@@ -27,6 +27,9 @@ from utils import mnm
 from logstash_formatter import LogstashFormatterV1
 from prometheus_async.aio import time as prom_time
 
+from apispec import APISpec
+from apispec_webframeworks.tornado import TornadoPlugin
+
 # Logging
 LOGLEVEL = os.getenv("LOGLEVEL", "INFO")
 if any("KUBERNETES" in k for k in os.environ):
@@ -94,6 +97,11 @@ VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 
 INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
 
+PATH_PREFIX = os.getenv('PATH_PREFIX', '/api/')
+APP_NAME = os.getenv('APP_NAME', 'ingress')
+
+API_PREFIX = PATH_PREFIX + APP_NAME
+
 # Message Queue
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
@@ -112,6 +120,22 @@ produce_queue = collections.deque([], 999)
 
 # Executor used to run non-async/blocking tasks
 thread_pool_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
+
+# Set up ApiSpec object
+spec = APISpec(
+    title='Insights Upload Service',
+    version='0.0.1',
+    openapi_version='3.0.0',
+    info=dict(
+        description='A service designed to ingest payloads from customers and distribute them via message queue to other platform services.',
+        contact=dict(
+            email='sadams@redhat.com'
+        )
+    ),
+    plugins=[
+        TornadoPlugin()
+    ]
+)
 
 
 def get_commit_date(commit_id):
@@ -140,14 +164,17 @@ def split_content(content):
     return service
 
 
-def strip_empty_facts(facts):
+def prepare_facts_for_inventory(facts):
     """
-    Empy values need to be stripped from metadata prior to posting to inventory.
+    Empty values need to be stripped from metadata prior to posting to inventory.
+    Display_name must be greater than 1 and less than 200 characters.
     """
     defined_facts = {}
     for fact in facts:
         if facts[fact]:
             defined_facts.update({fact: facts[fact]})
+    if 'display_name' in defined_facts and len(defined_facts['display_name']) not in range(2, 200):
+        defined_facts.pop('display_name')
     return defined_facts
 
 
@@ -264,18 +291,23 @@ async def handle_file(msgs):
 
 
 def post_to_inventory(identity, payload_id, values):
-    headers = {'x-rh-identity': identity, 'Content-Type': 'application/json'}
-    post = strip_empty_facts(values['metadata'])
+    headers = {'x-rh-identity': identity,
+               'Content-Type': 'application/json',
+               'x-rh-insights-request-id': payload_id,
+               }
+    post = prepare_facts_for_inventory(values['metadata'])
     post['account'] = values['account']
     try:
         response = requests.post(INVENTORY_URL, json=[post], headers=headers)
         if response.status_code != 207:
             error = response.json().get('detail')
             logger.error('Failed to post to inventory: %s', error)
+            logger.debug('Host data that failed to post: %s' % post)
             return None
         elif response.json()['data'][0]['status'] != 200 and response.json()['data'][0]['status'] != 201:
             error = response.json()['data'][0].get('detail')
             logger.error('Failed to post to inventory: ' + error, extra={"payload_id": payload_id})
+            logger.debug('Host data that failed to post: %s' % post)
             return None
         else:
             inv_id = response.json()['data'][0]['host']['id']
@@ -300,16 +332,36 @@ class NoAccessLog(tornado.web.RequestHandler):
 
 
 class RootHandler(NoAccessLog):
-    """Handles requests to root
+    """Handles requests to document root
     """
 
     def get(self):
         """Handle GET requests to the root url
+        ---
+        description: Used for OpenShift Liveliness probes
+        responses:
+            200:
+                description: OK
+                content:
+                    text/plain:
+                        schema:
+                            type: string
+                            example: boop
         """
         self.write("boop")
 
     def options(self):
         """Return a header containing the available methods
+        ---
+        description: Add a header containing allowed methods
+        responses:
+            200:
+                description: OK
+                headers:
+                    Allow:
+                        description: Allowed methods
+                        schema:
+                            type: string
         """
         self.add_header('Allow', 'GET, HEAD, OPTIONS')
 
@@ -339,6 +391,16 @@ class UploadHandler(tornado.web.RequestHandler):
 
     def get(self):
         """Handles GET requests to the upload endpoint
+        ---
+        description: Get accepted content types
+        responses:
+            200:
+                description: OK
+                content:
+                    text/plain:
+                        schema:
+                            type: string
+                            example: 'Accepted Content-Types: gzipped tarfile, zip file'
         """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
@@ -458,6 +520,15 @@ class UploadHandler(tornado.web.RequestHandler):
 
         Validate upload, get service name, create UUID, save to local storage,
         then offload for async processing
+        ---
+        description: Process Insights archive
+        responses:
+            202:
+                description: Upload payload accepted
+            413:
+                description: Payload too large
+            415:
+                description: Upload field not found
         """
         mnm.uploads_total.inc()
         self.identity = None
@@ -479,7 +550,7 @@ class UploadHandler(tornado.web.RequestHandler):
         else:
             mnm.uploads_valid.inc()
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
-            self.metadata = self.request.body_arguments['metadata'][0].decode('utf-8') if self.request.body_arguments.get('metadata') else None
+            self.metadata = self.__get_metadata_from_request()
             self.service = get_service(self.payload_data['content_type'])
             if self.request.headers.get('x-rh-identity'):
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
@@ -499,8 +570,24 @@ class UploadHandler(tornado.web.RequestHandler):
 
     def options(self):
         """Handle OPTIONS request to upload endpoint
+        ---
+        description: Add a header containing allowed methods
+        responses:
+            200:
+                description: OK
+                headers:
+                    Allow:
+                        description: Allowed methods
+                        schema:
+                            type: string
         """
         self.add_header('Allow', 'GET, POST, HEAD, OPTIONS')
+
+    def __get_metadata_from_request(self):
+        if self.request.files.get('metadata'):
+            return self.request.files['metadata'][0]['body'].decode('utf-8')
+        elif self.request.body_arguments.get('metadata'):
+            return self.request.body_arguments['metadata'][0].decode('utf-8')
 
 
 class VersionHandler(tornado.web.RequestHandler):
@@ -509,6 +596,22 @@ class VersionHandler(tornado.web.RequestHandler):
 
     def get(self):
         """Handle GET request to the `version` endpoint
+        ---
+        description: Get version identifying information
+        responses:
+            200:
+                description: OK
+                content:
+                    application/json:
+                        schema:
+                            type: object
+                            properties:
+                                commit:
+                                    type: string
+                                    example: ab3a3a90b48bb1101a287b754d33ac3b2316fdf2
+                                date:
+                                    type: string
+                                    example: '2019-03-19T14:17:27Z'
         """
         response = {'commit': BUILD_ID,
                     'date': BUILD_DATE}
@@ -520,15 +623,50 @@ class MetricsHandler(NoAccessLog):
     """
 
     def get(self):
+        """Get metrics for upload service
+        ---
+        description: Get metrics for upload service
+        responses:
+            200:
+                description: OK
+                content:
+                    text/plain:
+                        schema:
+                            type: string
+        """
         self.write(mnm.generate_latest())
 
 
+class SpecHandler(tornado.web.RequestHandler):
+    """Handle requests for service's API Spec
+    """
+
+    def get(self):
+        """Get the openapi/swagger spec for the upload service
+        ---
+        description: Get openapi spec for upload service
+        responses:
+            200:
+                description: OK
+        """
+        response = spec.to_dict()
+        self.write(response)
+
+
 endpoints = [
+    (API_PREFIX, RootHandler),
+    (API_PREFIX + "/v1/version", VersionHandler),
+    (API_PREFIX + "/v1/upload", UploadHandler),
+    (API_PREFIX + "/v1/openapi.json", SpecHandler),
     (r"/r/insights/platform/upload", RootHandler),
     (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
     (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
+    (r"/r/insights/platform/upload/api/v1/openapi.json", SpecHandler),
     (r"/metrics", MetricsHandler)
 ]
+
+for urlSpec in endpoints:
+    spec.path(urlspec=urlSpec)
 
 app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
 
