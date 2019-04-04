@@ -507,8 +507,8 @@ class UploadHandler(tornado.web.RequestHandler):
             filename = tmp.name
         return filename
 
-    def error(self, code, message):
-        logger.error(message)
+    def error(self, code, message, **kwargs):
+        logger.error(message, extra=kwargs)
         self.set_status(code, message)
         self.set_header("Content-Type", "text/plain")
         self.write(message)
@@ -532,12 +532,16 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         mnm.uploads_total.inc()
         self.identity = None
-
-        if not self.request.files.get('upload') and not self.request.files.get('file'):
-            return self.error(415, "Upload field not found")
-
         request_id = self.request.headers.get('x-rh-insights-request-id')
         self.payload_id = request_id if request_id else uuid.uuid4().hex
+
+        if not self.request.files.get('upload') and not self.request.files.get('file'):
+            return self.error(
+                415,
+                "Upload field not found",
+                files=list(self.request.files),
+                payload_id=self.payload_id,
+            )
 
         # TODO: pull this out once no one is using the upload field anymore
         self.payload_data = self.request.files.get('upload')[0] if self.request.files.get('upload') else self.request.files.get('file')[0]
