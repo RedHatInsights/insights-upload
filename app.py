@@ -284,6 +284,9 @@ async def handle_file(msgs):
                 url = await IOLoop.current().run_in_executor(
                     None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
                 )
+            elif result.lower() == 'handoff':
+                mnm.uploads_handed_off.inc()
+                logger.info('payload_id [%s] handed off', payload_id)
             else:
                 logger.info('Unrecognized result: %s', result.lower())
         else:
