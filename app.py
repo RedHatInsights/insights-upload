@@ -268,6 +268,7 @@ async def handle_file(msgs):
                         'account': data.get('account'),
                         'principal': data.get('principal'),
                         'b64_identity': data.get('b64_identity'),
+                        'satellite_managed': data.get('satellite_managed'),
                         'rh_account': data.get('account'),  # deprecated key, temp for backward compatibility
                         'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
                     }
