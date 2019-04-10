@@ -21,6 +21,8 @@ uploads_invalidated = Counter('uploads_validated_failure', 'The total amount of 
 uploads_too_large = Counter('uploads_too_large', 'The total amount of uploads great than max_length')
 uploads_unsupported_filetype = Counter('uploads_unsupported_filetype', 'The total amount of uploads not matching mimetype regex')
 uploads_handed_off = Counter('uploads_handed_off', 'The total number of uploads handed off')
+uploads_inventory_post_failure = Counter('uploads_inventory_post_failure', 'The total number of uploads that failed inventory post')
+uploads_inventory_post_success = Counter('uploads_inventory_post_success', 'The total number of uploads that succeeded inventory post')
 
 # Prometheus Summaries
 uploads_write_tarfile = Summary('uploads_write_tarfile_seconds', 'Total seconds it takes to write the tarfile upon upload')
