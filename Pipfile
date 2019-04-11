@@ -25,6 +25,7 @@ kafkahelpers = "*"
 prometheus-async = "*"
 requests = "*"
 attrs = "*"
+apidoc = "*"
 
 [requires]
 python_version = "3.6"

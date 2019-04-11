@@ -50,7 +50,6 @@ class TestContentRegex(TestCase):
         An invalid MIME type is correctly recognized.
         """
         mime_types = [
-            'application/vnd.redhat.insights.advisor+tbz2',
             'application/vnd.redhat.compliance+tgz',
             'application/vnd.redhat.my_app.service+zip',
             'text/vnd.redhat.insights.advisor+tgz',
@@ -62,8 +61,8 @@ class TestContentRegex(TestCase):
                 self.assertIsNone(search(app.content_regex, mime_type))
 
     def test_supports_legacy(self):
-        self.assertEqual("advisor", app.get_service("application/x-gzip; charset=binary"))
-        self.assertEqual("fab", app.get_service("application/vnd.redhat.fab.service+tgz"))
+        self.assertEqual({"service": "advisor", "category": "upload"}, app.get_service("application/x-gzip; charset=binary"))
+        self.assertEqual({"service": "fab", "category": "service"}, app.get_service("application/vnd.redhat.fab.service+tgz"))
 
 
 class TestUploadHandler(AsyncHTTPTestCase):
