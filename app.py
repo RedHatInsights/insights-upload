@@ -64,12 +64,15 @@ storage_driver = os.getenv("STORAGE_DRIVER", "s3")
 storage = import_module("utils.storage.{}".format(storage_driver))
 
 # Upload content type must match this regex. Third field matches end service
-content_regex = r'^application/vnd\.redhat\.([a-z0-9-]+)\.([a-z0-9-]+)\+(tgz|zip)$'
+content_regex = r'^application/vnd\.redhat\.(?P<service>[a-z0-9-]+)\.(?P<category>[a-z0-9-]+).*'
 
 # Items in this map are _special cases_ where the service cannot be extracted
 # from the Content-Type
 SERVICE_MAP = {
-    'application/x-gzip; charset=binary': 'advisor'
+    'application/x-gzip; charset=binary': {
+        'service': 'advisor',
+        'category': 'upload'
+    }
 }
 
 # set max length to 10.5 MB (one MB larger than peak)
@@ -151,19 +154,6 @@ else:
     BUILD_DATE = get_commit_date(BUILD_ID)
 
 
-def split_content(content):
-    """Split the content_type to find the service name
-
-    Arguments:
-        content {str} -- content-type of the payload
-
-    Returns:
-        str -- Service name to be notified of upload
-    """
-    service = content.split('.')[2]
-    return service
-
-
 def prepare_facts_for_inventory(facts):
     """
     Empty values need to be stripped from metadata prior to posting to inventory.
@@ -187,7 +177,7 @@ def get_service(content_type):
     else:
         m = re.search(content_regex, content_type)
         if m:
-            return split_content(content_type)
+            return m.groupdict()
     raise Exception("Could not resolve a service from the given content_type")
 
 
@@ -387,12 +377,12 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_too_large.inc()
             return self.error(413, f"Payload too large: {content_length}. Should not exceed {MAX_LENGTH} bytes")
         try:
-            get_service(self.payload_data['content_type'])
+            serv_dict = get_service(self.payload_data['content_type'])
         except Exception:
             mnm.uploads_unsupported_filetype.inc()
             logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"payload_id": self.payload_id})
             return self.error(415, 'Unsupported Media Type')
-        if not DEVMODE and get_service(self.payload_data['content_type']) not in VALID_TOPICS:
+        if not DEVMODE and serv_dict["service"] not in VALID_TOPICS:
             logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"payload_id": self.payload_id})
             return self.error(415, 'Unsupported MIME type')
 
@@ -478,6 +468,7 @@ class UploadHandler(tornado.web.RequestHandler):
         values['hash'] = self.payload_id  # provided for backward compatibility
         values['size'] = self.size
         values['service'] = self.service
+        values['category'] = self.category
         values['b64_identity'] = self.b64_identity
         if self.metadata:
             values['metadata'] = json.loads(self.metadata)
@@ -562,7 +553,9 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_valid.inc()
             self.tracking_id = str(self.request.headers.get('Tracking-ID', "null"))
             self.metadata = self.__get_metadata_from_request()
-            self.service = get_service(self.payload_data['content_type'])
+            service_dict = get_service(self.payload_data['content_type'])
+            self.service = service_dict["service"]
+            self.category = service_dict["category"]
             if self.request.headers.get('x-rh-identity'):
                 header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 self.identity = header['identity']
