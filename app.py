@@ -141,6 +141,13 @@ spec = APISpec(
 )
 
 
+async def defer(*args):
+    mnm.uploads_executor_qsize.set(thread_pool_executor.qsize())
+    res = await IOLoop.current().run_in_executor(None, *args)
+    mnm.uploads_executor_qsize.set(thread_pool_executor.qsize())
+    return res
+
+
 def get_commit_date(commit_id):
     BASE_URL = "https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/"
     response = requests.get(BASE_URL + commit_id)
@@ -241,13 +248,13 @@ async def handle_file(msgs):
 
         logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"payload_id": payload_id})
 
-        if storage.ls(storage.QUARANTINE, payload_id)['ResponseMetadata']['HTTPStatusCode'] == 200:
+        r = await defer(storage.ls, storage.QUARANTINE, payload_id)
+
+        if r['ResponseMetadata']['HTTPStatusCode'] == 200:
             if result.lower() == 'success':
                 mnm.uploads_validated.inc()
 
-                url = await IOLoop.current().run_in_executor(
-                    None, storage.copy, storage.QUARANTINE, storage.PERM, payload_id
-                )
+                url = await defer(storage.copy, storage.QUARANTINE, storage.PERM, payload_id)
                 data = {
                     'topic': 'platform.upload.available',
                     'msg': {
@@ -272,9 +279,7 @@ async def handle_file(msgs):
             elif result.lower() == 'failure':
                 mnm.uploads_invalidated.inc()
                 logger.info('payload_id [%s] rejected', payload_id)
-                url = await IOLoop.current().run_in_executor(
-                    None, storage.copy, storage.QUARANTINE, storage.REJECT, payload_id
-                )
+                url = await defer(storage.copy, storage.QUARANTINE, storage.REJECT, payload_id)
             elif result.lower() == 'handoff':
                 mnm.uploads_handed_off.inc()
                 logger.info('payload_id [%s] handed off', payload_id)
@@ -421,9 +426,7 @@ class UploadHandler(tornado.web.RequestHandler):
         logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"payload_id": payload_id})
 
         try:
-            url = await IOLoop.current().run_in_executor(
-                None, storage.write, filename, storage.QUARANTINE, payload_id
-            )
+            url = await defer(storage.write, filename, storage.QUARANTINE, payload_id)
             elapsed = time() - upload_start
 
             logger.info(
@@ -439,7 +442,7 @@ class UploadHandler(tornado.web.RequestHandler):
                 tracking_id, payload_id, elapsed, extra={"payload_id": payload_id}
             )
         finally:
-            await IOLoop.current().run_in_executor(None, os.remove, filename)
+            await defer(os.remove, filename)
 
     async def process_upload(self):
         """Process the uploaded file we have received.
@@ -563,7 +566,7 @@ class UploadHandler(tornado.web.RequestHandler):
             self.size = int(self.request.headers['Content-Length'])
             body = self.payload_data['body']
 
-            self.filename = await IOLoop.current().run_in_executor(None, self.write_data, body)
+            self.filename = await defer(self.write_data, body)
 
             self.set_status(202, "Accepted")
 
