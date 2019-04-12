@@ -3,7 +3,7 @@ import os
 
 import requests
 
-from prometheus_client import Counter, Summary, generate_latest # noqa
+from prometheus_client import Counter, Summary, Gauge, generate_latest # noqa
 
 INFLUXDB_PLATFORM = os.getenv('INFLUX_URL', 'http://influxdb.mnm.svc.cluster.local:8086/write?db=platform')
 INFLUX_USER = os.getenv('INFLUX_USER')
@@ -33,6 +33,9 @@ uploads_handle_file_seconds = Summary('uploads_handle_file_seconds', 'Total time
 uploads_s3_copy_seconds = Summary('uploads_s3_copy_seconds', 'Total time to copy a file from bucket to bucket')
 uploads_s3_write_seconds = Summary('uploads_s3_write_seconds', 'Total time to write to a bucket')
 uploads_s3_ls_seconds = Summary('uploads_s3_ls_seconds', 'Total time to list a file in S3')
+
+# threadpool metrics
+uploads_executor_qsize = Gauge("uploads_executor_qsize", "Approximate number of items in the executor queue")
 
 logger = logging.getLogger(__name__)
 
