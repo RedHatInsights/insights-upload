@@ -142,9 +142,9 @@ spec = APISpec(
 
 
 async def defer(*args):
-    mnm.uploads_executor_qsize.set(thread_pool_executor.qsize())
+    mnm.uploads_executor_qsize.set(thread_pool_executor._work_queue.qsize())
     res = await IOLoop.current().run_in_executor(None, *args)
-    mnm.uploads_executor_qsize.set(thread_pool_executor.qsize())
+    mnm.uploads_executor_qsize.set(thread_pool_executor._work_queue.qsize())
     return res
 
 
