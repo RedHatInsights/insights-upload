@@ -8,6 +8,7 @@ import base64
 import sys
 import requests
 import uuid
+import watchtower
 
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
@@ -23,9 +24,10 @@ from requests import ConnectionError
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
-from utils import mnm
+from utils import mnm, config
 from logstash_formatter import LogstashFormatterV1
 from prometheus_async.aio import time as prom_time
+from boto3.session import Session
 
 from apispec import APISpec
 from apispec_webframeworks.tornado import TornadoPlugin
@@ -44,6 +46,20 @@ else:
     )
 
 logger = logging.getLogger('upload-service')
+
+try:
+    with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+        NAMESPACE = f.read()
+except EnvironmentError:
+    logger.info("Not Running on Openshift")
+
+if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
+    CW_SESSION = Session(aws_access_key_id=config.CW_AWS_ACCESS_KEY_ID,
+                         aws_secret_access_key=config.CW_AWS_SECRET_ACCESS_KEY,
+                         region_name=config.CW_AWS_REGION_NAME)
+    logger.addHandler(watchtower.CloudWatchLogHandler(boto3_session=CW_SESSION,
+                                                      log_group="upload-service",
+                                                      stream_name=NAMESPACE))
 
 DEVMODE = os.getenv('DEV', False)
 
