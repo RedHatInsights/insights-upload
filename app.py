@@ -57,9 +57,11 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     CW_SESSION = Session(aws_access_key_id=config.CW_AWS_ACCESS_KEY_ID,
                          aws_secret_access_key=config.CW_AWS_SECRET_ACCESS_KEY,
                          region_name=config.CW_AWS_REGION_NAME)
-    logger.addHandler(watchtower.CloudWatchLogHandler(boto3_session=CW_SESSION,
-                                                      log_group="upload-service",
-                                                      stream_name=NAMESPACE))
+    cw_handler = watchtower.CloudWatchLogHandler(boto3_session=CW_SESSION,
+                                                 log_group="platform",
+                                                 stream_name=NAMESPACE)
+    cw_handler.setFormatter(LogstashFormatterV1())
+    logger.addHandler(cw_handler)
 
 DEVMODE = os.getenv('DEV', False)
 
