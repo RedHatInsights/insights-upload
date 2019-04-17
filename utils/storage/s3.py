@@ -1,10 +1,12 @@
 import boto3
 import os
+import logging
 
 from utils import mnm
 
 from botocore.exceptions import ClientError
 
+logger = logging.getLogger("upload-service")
 
 AWS_ACCESS_KEY_ID = os.getenv('AWS_ACCESS_KEY_ID', None)
 AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', None)
@@ -27,6 +29,7 @@ def write(data, dest, uuid):
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
                                             'Key': uuid}, ExpiresIn=86400)
+    logger.info("Data written to s3", extra={"request_id": uuid})
     return url
 
 
@@ -39,6 +42,7 @@ def copy(src, dest, uuid):
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
                                             'Key': uuid}, ExpiresIn=86400)
+    logger.info("Data copied to %s bucket", dest, extra={"request_id": uuid})
     return url
 
 
