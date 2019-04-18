@@ -265,7 +265,7 @@ async def handle_file(msgs):
             continue
 
         if 'payload_id' not in data and 'hash' not in data:
-            logger.error("payload_id or hash not in message. Payload not removed from quarantine.")
+            logger.error("payload_id or hash not in message. Payload not removed from permanent.")
             continue
 
         # get the payload_id. Getting the hash is temporary until consumers update
@@ -274,13 +274,13 @@ async def handle_file(msgs):
 
         logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id})
 
-        r = await defer(storage.ls, storage.QUARANTINE, payload_id)
+        r = await defer(storage.ls, storage.PERM, payload_id)
 
         if r['ResponseMetadata']['HTTPStatusCode'] == 200:
             if result.lower() == 'success':
                 mnm.uploads_validated.inc()
 
-                url = await defer(storage.copy, storage.QUARANTINE, storage.PERM, payload_id)
+                url = await defer(storage.get_url, storage.PERM, payload_id)
                 data = {
                     'topic': 'platform.upload.available',
                     'msg': {
@@ -305,14 +305,14 @@ async def handle_file(msgs):
             elif result.lower() == 'failure':
                 mnm.uploads_invalidated.inc()
                 logger.info('payload_id [%s] rejected', payload_id)
-                url = await defer(storage.copy, storage.QUARANTINE, storage.REJECT, payload_id)
+                url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id)
             elif result.lower() == 'handoff':
                 mnm.uploads_handed_off.inc()
                 logger.info('payload_id [%s] handed off', payload_id)
             else:
                 logger.info('Unrecognized result: %s', result.lower())
         else:
-            logger.info('payload_id [%s] no longer in quarantine', payload_id, extra={"request_id": payload_id})
+            logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id})
 
 
 def post_to_inventory(identity, payload_id, values):
@@ -453,7 +453,7 @@ class UploadHandler(tornado.web.RequestHandler):
         logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"request_id": payload_id})
 
         try:
-            url = await defer(storage.write, filename, storage.QUARANTINE, payload_id)
+            url = await defer(storage.write, filename, storage.PERM, payload_id)
             elapsed = time() - upload_start
 
             logger.info(
