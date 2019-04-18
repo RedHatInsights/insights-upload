@@ -90,6 +90,10 @@ SERVICE_MAP = {
     'application/x-gzip; charset=binary': {
         'service': 'advisor',
         'category': 'upload'
+    },
+    'application/vnd.redhat.openshift.periodic': {
+        'service': 'buckit',
+        'category': 'openshift'
     }
 }
 
