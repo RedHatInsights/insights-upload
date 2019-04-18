@@ -33,6 +33,7 @@ uploads_handle_file_seconds = Summary('uploads_handle_file_seconds', 'Total time
 uploads_s3_copy_seconds = Summary('uploads_s3_copy_seconds', 'Total time to copy a file from bucket to bucket')
 uploads_s3_write_seconds = Summary('uploads_s3_write_seconds', 'Total time to write to a bucket')
 uploads_s3_ls_seconds = Summary('uploads_s3_ls_seconds', 'Total time to list a file in S3')
+uploads_s3_get_url_seconds = Summary('upload_s3_get_url_seconds', 'Total time to get a presigned url')
 
 # threadpool metrics
 uploads_executor_qsize = Gauge("uploads_executor_qsize", "Approximate number of items in the executor queue")
