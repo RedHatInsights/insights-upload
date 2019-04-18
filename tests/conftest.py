@@ -54,8 +54,8 @@ app = prepare_app()
 def s3_mocked():
     with mock_s3():
         client = boto3.client("s3")
-        client.create_bucket(Bucket=s3_storage.QUARANTINE)
         client.create_bucket(Bucket=s3_storage.PERM)
+        client.create_bucket(Bucket=s3_storage.REJECT)
         s3_storage.s3 = client
 
         yield client
@@ -177,7 +177,7 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
 
         file_path = s3_storage.write(
             _file,
-            s3_storage.QUARANTINE,
+            s3_storage.PERM,
             file_name
         )
 

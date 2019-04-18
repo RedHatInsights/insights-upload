@@ -18,7 +18,7 @@ class TestS3(object):
     @pytest.mark.withoutresponses
     def test_credentials_acl(self):
         try:
-            for bucket in (s3_storage.QUARANTINE, s3_storage.PERM, s3_storage.REJECT):
+            for bucket in (s3_storage.PERM, s3_storage.REJECT):
                 credentials = s3_storage.s3.get_bucket_acl(Bucket=bucket)
                 assert credentials['Grants'][0]['Permission'], 'FULL_CONTROL'
         except ClientError:
@@ -29,32 +29,32 @@ class TestS3(object):
 
         url = s3_storage.write(
             local_file,
-            s3_storage.QUARANTINE,
+            s3_storage.PERM,
             key_name
         )
 
         assert url is not None
         assert isinstance(url, str)
-        assert s3_storage.QUARANTINE in url
+        assert s3_storage.PERM in url
 
     def test_copy(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 
         write_file_path = s3_storage.write(
             local_file,
-            s3_storage.QUARANTINE,
+            s3_storage.PERM,
             key_name
         )
-        copy_file_path = s3_storage.copy(s3_storage.QUARANTINE, s3_storage.PERM, key_name)
+        copy_file_path = s3_storage.copy(s3_storage.PERM, s3_storage.REJECT, key_name)
 
         def _get_key(r):
             k = r.split('/')[3]
             return k[:k.find('?')]
 
         assert isinstance(write_file_path, str)
-        assert s3_storage.QUARANTINE in write_file_path
+        assert s3_storage.PERM in write_file_path
         assert copy_file_path is not None
-        assert s3_storage.PERM in copy_file_path
+        assert s3_storage.REJECT in copy_file_path
         assert copy_file_path != write_file_path
 
         write_key, copy_key = _get_key(write_file_path), _get_key(copy_file_path)
@@ -64,11 +64,11 @@ class TestS3(object):
         key_name = uuid.uuid4().hex
         file_url = s3_storage.write(
             local_file,
-            s3_storage.QUARANTINE,
+            s3_storage.PERM,
             key_name
         )
 
-        ls_response = s3_storage.ls(s3_storage.QUARANTINE, key_name)
+        ls_response = s3_storage.ls(s3_storage.PERM, key_name)
 
         assert file_url is not None
         assert isinstance(ls_response, dict)
@@ -77,13 +77,13 @@ class TestS3(object):
         assert ls_response['ResponseMetadata']['HTTPStatusCode'] == 200
 
     def test_up_check(self, s3_mocked):
-        assert s3_storage.up_check(s3_storage.QUARANTINE) is True
+        assert s3_storage.up_check(s3_storage.PERM) is True
         assert s3_storage.up_check('SomeBucket') is False
 
     def test_ls_not_found(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 
-        assert s3_storage.ls(s3_storage.QUARANTINE, key_name)['ResponseMetadata']['HTTPStatusCode'] == 404
+        assert s3_storage.ls(s3_storage.PERM, key_name)['ResponseMetadata']['HTTPStatusCode'] == 404
 
 
 class TestLocalDisk(object):
@@ -97,7 +97,7 @@ class TestLocalDisk(object):
         self.non_existing_folder = 'some-random-folder'
 
     def test_write(self, with_local_folders):
-        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        file_name = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
@@ -107,7 +107,7 @@ class TestLocalDisk(object):
             local_storage.write(self._get_file_data(), self.non_existing_folder, self.temp_file_name)
 
     def test_write_no_folders_at_all(self, no_local_folders):
-        file_name = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        file_name = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
@@ -118,15 +118,15 @@ class TestLocalDisk(object):
         """
         Write method returns a file name
         """
-        result = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        result = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
         assert result == open_mock.return_value.__enter__.return_value.name
 
     def test_ls(self, with_local_folders):
-        local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
-        assert local_storage.ls(local_storage.QUARANTINE, self.temp_file_name) is True
+        local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
+        assert local_storage.ls(local_storage.PERM, self.temp_file_name) is True
 
     def test_ls_file_not_found(self, with_local_folders):
-        assert local_storage.ls(local_storage.QUARANTINE, self.temp_file_name) is None
+        assert local_storage.ls(local_storage.PERM, self.temp_file_name) is None
 
     def test_stage(self, no_local_folders):
         # just to make sure that there is no folder left in there
@@ -136,13 +136,13 @@ class TestLocalDisk(object):
             assert os.path.isdir(_dir) is True
 
     def test_copy(self, with_local_folders):
-        original_file_path = local_storage.write(self._get_file_data(), local_storage.QUARANTINE, self.temp_file_name)
+        original_file_path = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
 
         original_file = open(original_file_path, 'rb')
         original_checksum = hashlib.md5(original_file.read()).hexdigest()
         original_file.close()
 
-        copied_file_path = local_storage.copy(local_storage.QUARANTINE, local_storage.PERM, self.temp_file_name)
+        copied_file_path = local_storage.copy(local_storage.PERM, local_storage.REJECT, self.temp_file_name)
 
         assert os.path.basename(original_file_path) == os.path.basename(copied_file_path)
         assert original_file_path != copied_file_path
