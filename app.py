@@ -171,8 +171,12 @@ async def defer(*args):
 
 
 def get_commit_date(commit_id):
+    if os.getenv("GITHUB_ACCESS_TOKEN"):
+        headers = {"Authorization": "token %s" % os.getenv("GITHUB_ACCESS_TOKEN")}
+    else:
+        headers = {}
     BASE_URL = "https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/"
-    response = requests.get(BASE_URL + commit_id)
+    response = requests.get(BASE_URL + commit_id, headers=headers)
     date = response.json()['committer']['date']
     return date
 
