@@ -13,7 +13,6 @@ AWS_SECRET_ACCESS_KEY = os.getenv('AWS_SECRET_ACCESS_KEY', None)
 S3_ENDPOINT_URL = os.getenv('S3_ENDPOINT_URL', None)
 
 # S3 buckets
-QUARANTINE = os.getenv('S3_QUARANTINE', 'insights-upload-quarantine')
 PERM = os.getenv('S3_PERM', 'insights-upload-perm-test')
 REJECT = os.getenv('S3_REJECT', 'insights-upload-rejected')
 
@@ -43,6 +42,14 @@ def copy(src, dest, uuid):
                                     Params={'Bucket': dest,
                                             'Key': uuid}, ExpiresIn=86400)
     logger.info("Data copied to %s bucket", dest, extra={"request_id": uuid})
+    return url
+
+
+@mnm.uploads_s3_get_url_seconds.time()
+def get_url(bucket, uuid):
+    url = s3.generate_presigned_url("get_object",
+                                    Params={"Bucket": bucket,
+                                            "Key": uuid}, ExpiresIn=86400)
     return url
 
 
