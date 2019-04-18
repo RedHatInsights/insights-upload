@@ -1,11 +1,9 @@
 import os
 
-QUARANTINE = os.getenv('S3_QUARANTINE', 'insights-upload-quarantine')
 PERM = os.getenv('S3_PERM', 'insights-upload-perm-test')
 REJECT = os.getenv('S3_REJECT', 'insights-upload-rejected')
 WORKDIR = os.getenv('WORKDIR', '/tmp/uploads')
 dirs = [WORKDIR,
-        os.path.join(WORKDIR, QUARANTINE),
         os.path.join(WORKDIR, PERM),
         os.path.join(WORKDIR, REJECT)]
 
