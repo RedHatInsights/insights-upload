@@ -26,6 +26,9 @@ prometheus-async = "*"
 requests = "*"
 attrs = "*"
 apidoc = "*"
+watchtower = "*"
+apispec = "*"
+apispec-webframeworks = "*"
 
 [requires]
 python_version = "3.6"
