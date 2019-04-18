@@ -76,10 +76,6 @@ class TestS3(object):
         assert ls_response['ContentLength'] == os.stat(local_file).st_size
         assert ls_response['ResponseMetadata']['HTTPStatusCode'] == 200
 
-    def test_up_check(self, s3_mocked):
-        assert s3_storage.up_check(s3_storage.PERM) is True
-        assert s3_storage.up_check('SomeBucket') is False
-
     def test_ls_not_found(self, local_file, s3_mocked):
         key_name = uuid.uuid4().hex
 

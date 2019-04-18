@@ -60,14 +60,3 @@ def ls(src, uuid):
         return result
     except ClientError:
         return {'ResponseMetadata': {'HTTPStatusCode': 404}}
-
-
-def up_check(name):
-    exists = True
-    try:
-        s3.head_bucket(Bucket=name)
-    except ClientError as e:
-        if int(e.response['Error']['Code']) == 404:
-            exists = False
-
-    return exists
