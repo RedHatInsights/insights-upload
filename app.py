@@ -357,8 +357,11 @@ class UploadHandler(tornado.web.RequestHandler):
         upload_start = time()
         logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"request_id": payload_id})
 
+        account = self.identity.get("account_number")
+        user_agent = self.request.headers.get("User-Agent")
         try:
-            url = await defer(storage.write, filename, storage.PERM, payload_id)
+            url = await defer(storage.write, filename, storage.PERM, payload_id,
+                              account, user_agent)
             elapsed = time() - upload_start
 
             logger.info(
