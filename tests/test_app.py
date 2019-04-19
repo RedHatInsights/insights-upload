@@ -187,6 +187,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
 class TestInventoryPost(object):
 
+    @asyncio.coroutine
     @responses.activate
     @patch("app.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
     def test_post_to_inventory_success(self):
@@ -199,6 +200,7 @@ class TestInventoryPost(object):
         assert len(responses.calls) == 1
         assert responses.calls[0].response.text == '{"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}'
 
+    @asyncio.coroutine
     @responses.activate
     @patch("app.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
     def test_post_to_inventory_fail(self):
