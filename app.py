@@ -17,7 +17,7 @@ from time import time
 
 import tornado.ioloop
 import tornado.web
-import tornado.httpclient
+from tornado.httpclient import AsyncHTTPClient
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
 from requests import ConnectionError
@@ -220,30 +220,33 @@ async def handle_file(msgs):
             logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id})
 
 
-def post_to_inventory(identity, payload_id, values):
+async def post_to_inventory(identity, payload_id, values):
     headers = {'x-rh-identity': identity,
                'Content-Type': 'application/json',
                'x-rh-insights-request-id': payload_id,
                }
     post = prepare_facts_for_inventory(values['metadata'])
     post['account'] = values['account']
+    post = json.dumps([post])
     try:
-        response = requests.post(config.INVENTORY_URL, json=[post], headers=headers)
-        if response.status_code != 207:
+        httpclient = AsyncHTTPClient()
+        response = await httpclient.fetch(config.INVENTORY_URL, body=post, headers=headers, method="POST")
+        body = json.loads(response.body)
+        if response.code != 207:
             mnm.uploads_inventory_post_failure.inc()
-            error = response.json().get('detail')
+            error = body.get('detail')
             logger.error('Failed to post to inventory: %s', error, extra={"request_id": payload_id})
             logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id})
             return None
-        elif response.json()['data'][0]['status'] != 200 and response.json()['data'][0]['status'] != 201:
+        elif body['data'][0]['status'] != 200 and body['data'][0]['status'] != 201:
             mnm.uploads_inventory_post_failure.inc()
-            error = response.json()['data'][0].get('detail')
+            error = body['data'][0].get('detail')
             logger.error('Failed to post to inventory: ' + error, extra={"request_id": payload_id})
             logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id})
             return None
         else:
             mnm.uploads_inventory_post_success.inc()
-            inv_id = response.json()['data'][0]['host']['id']
+            inv_id = body['data'][0]['host']['id']
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"request_id": payload_id,
                                                                                                 "id": inv_id})
             return inv_id
@@ -410,7 +413,7 @@ class UploadHandler(tornado.web.RequestHandler):
         values['b64_identity'] = self.b64_identity
         if self.metadata:
             values['metadata'] = json.loads(self.metadata)
-            values['id'] = post_to_inventory(self.b64_identity, self.payload_id, values)
+            values['id'] = await post_to_inventory(self.b64_identity, self.payload_id, values)
             del values['metadata']
 
         url = await self.upload(self.filename, self.tracking_id, self.payload_id)
