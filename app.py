@@ -6,7 +6,6 @@ import os
 import re
 import base64
 import sys
-import requests
 import uuid
 import watchtower
 
@@ -17,10 +16,9 @@ from time import time
 
 import tornado.ioloop
 import tornado.web
-from tornado.httpclient import AsyncHTTPClient
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
-from requests import ConnectionError
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
@@ -250,7 +248,7 @@ async def post_to_inventory(identity, payload_id, values):
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"request_id": payload_id,
                                                                                                 "id": inv_id})
             return inv_id
-    except ConnectionError:
+    except HTTPClientError:
         logger.error("Unable to contact inventory", extra={"request_id": payload_id})
 
 
