@@ -41,7 +41,10 @@ API_PREFIX = PATH_PREFIX + APP_NAME
 MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
 MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 
-BUILD_ID = os.getenv('OPENSHIFT_BUILD_COMMIT', 'somemadeupvalue')
+BUILD_ID = os.getenv('OPENSHIFT_BUILD_COMMIT', '8d06f664a88253c361e61af5a4fa2ac527bb5f46')
+
+TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/tmp/topics.json')
+
 
 # Items in this map are _special cases_ where the service cannot be extracted
 # from the Content-Type
@@ -96,7 +99,6 @@ def get_namespace():
 
 def get_valid_topics():
     VALID_TOPICS = []
-    TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.json')
     with open(TOPIC_CONFIG, 'r') as f:
         data = f.read().replace("'", '"')
         topic_config = json.loads(data)
