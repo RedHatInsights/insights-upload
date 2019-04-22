@@ -79,6 +79,7 @@ produce_queue = collections.deque([], 999)
 # Executor used to run non-async/blocking tasks
 thread_pool_executor = ThreadPoolExecutor(max_workers=config.MAX_WORKERS)
 
+
 async def defer(*args):
     mnm.uploads_executor_qsize.set(thread_pool_executor._work_queue.qsize())
     res = await IOLoop.current().run_in_executor(None, *args)
