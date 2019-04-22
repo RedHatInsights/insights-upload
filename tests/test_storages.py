@@ -9,8 +9,7 @@ import pytest
 import responses
 from botocore.exceptions import ClientError
 
-import app
-from utils import mnm
+from utils import mnm, config
 from utils.storage import localdisk as local_storage, s3 as s3_storage
 
 
@@ -32,7 +31,7 @@ class TestS3(object):
             local_file,
             s3_storage.PERM,
             key_name,
-            app.DUMMY_VALUES['account'],
+            config.DUMMY_VALUES['account'],
             'curl/7.61.1'
         )
 
@@ -47,7 +46,7 @@ class TestS3(object):
             local_file,
             s3_storage.PERM,
             key_name,
-            app.DUMMY_VALUES['account'],
+            config.DUMMY_VALUES['account'],
             'curl/7.61.1'
         )
         copy_file_path = s3_storage.copy(s3_storage.PERM, s3_storage.REJECT, key_name)
@@ -71,7 +70,7 @@ class TestS3(object):
             local_file,
             s3_storage.PERM,
             key_name,
-            app.DUMMY_VALUES['account'],
+            config.DUMMY_VALUES['account'],
             'curl/7.61.1'
         )
 

@@ -179,7 +179,7 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
             _file,
             s3_storage.PERM,
             file_name,
-            app.DUMMY_VALUES['account'],
+            config.DUMMY_VALUES['account'],
             'curl/7.61.1'
         )
 
