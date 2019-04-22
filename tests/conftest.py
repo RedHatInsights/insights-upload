@@ -178,7 +178,9 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
         file_path = s3_storage.write(
             _file,
             s3_storage.PERM,
-            file_name
+            file_name,
+            app.DUMMY_VALUES['account'],
+            'curl/7.61.1'
         )
 
         values = {
