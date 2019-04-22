@@ -58,7 +58,7 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     logger.addHandler(cw_handler)
 
 if not config.DEVMODE:
-    config.get_valid_topics()
+    VALID_TOPICS = config.get_valid_topics()
 
 # Set Storage driver to use
 storage = import_module("utils.storage.{}".format(config.STORAGE_DRIVER))
@@ -174,11 +174,9 @@ async def handle_file(msgs):
 
         # get the payload_id. Getting the hash is temporary until consumers update
         payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
-        account = data.get("account")
         result = data.get('validation')
 
-        logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id,
-                                                                                        "account": account})
+        logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id})
 
         r = await defer(storage.ls, storage.PERM, payload_id)
 
@@ -205,8 +203,7 @@ async def handle_file(msgs):
                 produce_queue.append(data)
                 logger.info(
                     "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
-                    data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id,
-                                                                          "account": account}
+                    data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id}
                 )
                 logger.debug("payload_id [%s] data: %s", payload_id, data)
             elif result.lower() == 'failure':
@@ -219,8 +216,7 @@ async def handle_file(msgs):
             else:
                 logger.info('Unrecognized result: %s', result.lower())
         else:
-            logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id,
-                                                                                            "account": account})
+            logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id})
 
 
 def post_to_inventory(identity, payload_id, values):
@@ -235,29 +231,23 @@ def post_to_inventory(identity, payload_id, values):
         if response.status_code != 207:
             mnm.uploads_inventory_post_failure.inc()
             error = response.json().get('detail')
-            logger.error('Failed to post to inventory: %s', error, extra={"request_id": payload_id,
-                                                                          "account": values.get("account")})
-            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id,
-                                                                            "account": values.get("account")})
+            logger.error('Failed to post to inventory: %s', error, extra={"request_id": payload_id})
+            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id})
             return None
         elif response.json()['data'][0]['status'] != 200 and response.json()['data'][0]['status'] != 201:
             mnm.uploads_inventory_post_failure.inc()
             error = response.json()['data'][0].get('detail')
-            logger.error('Failed to post to inventory: ' + error, extra={"request_id": payload_id,
-                                                                         "account": values.get("account")})
-            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id,
-                                                                            "account": values.get("account")})
+            logger.error('Failed to post to inventory: ' + error, extra={"request_id": payload_id})
+            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id})
             return None
         else:
             mnm.uploads_inventory_post_success.inc()
             inv_id = response.json()['data'][0]['host']['id']
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"request_id": payload_id,
-                                                                                                "id": inv_id,
-                                                                                                "account": values.get("account")})
+                                                                                                "id": inv_id})
             return inv_id
     except ConnectionError:
-        logger.error("Unable to contact inventory", extra={"request_id": payload_id,
-                                                           "account": values.get("account")})
+        logger.error("Unable to contact inventory", extra={"request_id": payload_id})
 
 
 class NoAccessLog(tornado.web.RequestHandler):
@@ -320,19 +310,16 @@ class UploadHandler(tornado.web.RequestHandler):
         content_length = int(self.request.headers["Content-Length"])
         if content_length >= config.MAX_LENGTH:
             mnm.uploads_too_large.inc()
-            logger.error("Payload too large. Request ID [%s] - Length %s", self.payload_id, str(config.MAX_LENGTH), extra={"request_id": self.payload_id,
-                                                                                                                           "account": self.identity.get("account_number")})
+            logger.error("Payload too large. Request ID [%s] - Length %s", self.payload_id, str(config.MAX_LENGTH), extra={"request_id": self.payload_id})
             return self.error(413, f"Payload too large: {content_length}. Should not exceed {config.MAX_LENGTH} bytes")
         try:
             serv_dict = get_service(self.payload_data['content_type'])
         except Exception:
             mnm.uploads_unsupported_filetype.inc()
-            logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id,
-                                                                                                                                      "account": self.identity.get("account_number")})
+            logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id})
             return self.error(415, 'Unsupported Media Type')
-        if not config.DEVMODE and serv_dict["service"] not in config.VALID_TOPICS:
-            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id,
-                                                                                                                                     "account": self.identity.get("account_number")})
+        if not config.DEVMODE and serv_dict["service"] not in VALID_TOPICS:
+            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id})
             return self.error(415, 'Unsupported MIME type')
 
     def get(self):
@@ -367,8 +354,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
 
         upload_start = time()
-        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"request_id": payload_id,
-                                                                                                          "account": self.identity.get("account_number")})
+        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"request_id": payload_id})
 
         try:
             url = await defer(storage.write, filename, storage.PERM, payload_id)
@@ -376,8 +362,7 @@ class UploadHandler(tornado.web.RequestHandler):
 
             logger.info(
                 "tracking id [%s] payload_id [%s] uploaded! elapsed [%fsec] url [%s]",
-                tracking_id, payload_id, elapsed, url, extra={"request_id": payload_id,
-                                                              "account": self.identity.get("account_number")}
+                tracking_id, payload_id, elapsed, url, extra={"request_id": payload_id}
             )
 
             return url
@@ -385,8 +370,7 @@ class UploadHandler(tornado.web.RequestHandler):
             elapsed = time() - upload_start
             logger.exception(
                 "Exception hit uploading: tracking id [%s] payload_id [%s] elapsed [%fsec]",
-                tracking_id, payload_id, elapsed, extra={"request_id": payload_id,
-                                                         "account": self.identity.get("account_number")}
+                tracking_id, payload_id, elapsed, extra={"request_id": payload_id}
             )
         finally:
             await defer(os.remove, filename)
@@ -433,8 +417,7 @@ class UploadHandler(tornado.web.RequestHandler):
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
-                self.payload_id, topic, len(produce_queue), extra={"request_id": self.payload_id,
-                                                                   "account": self.identity.get("account_number")}
+                self.payload_id, topic, len(produce_queue), extra={"request_id": self.payload_id}
             )
 
     @mnm.uploads_write_tarfile.time()
