@@ -6,7 +6,6 @@ import os
 import re
 import base64
 import sys
-import requests
 import uuid
 import watchtower
 
@@ -17,10 +16,9 @@ from time import time
 
 import tornado.ioloop
 import tornado.web
-from tornado.httpclient import AsyncHTTPClient
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
-from requests import ConnectionError
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
@@ -29,8 +27,6 @@ from logstash_formatter import LogstashFormatterV1
 from prometheus_async.aio import time as prom_time
 from boto3.session import Session
 
-from apispec import APISpec
-from apispec_webframeworks.tornado import TornadoPlugin
 
 # Logging
 LOGLEVEL = os.getenv("LOGLEVEL", "INFO")
@@ -47,11 +43,7 @@ else:
 
 logger = logging.getLogger('upload-service')
 
-try:
-    with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
-        NAMESPACE = f.read()
-except EnvironmentError:
-    logger.info("Not Running on Openshift")
+NAMESPACE = config.get_namespace()
 
 if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     CW_SESSION = Session(aws_access_key_id=config.CW_AWS_ACCESS_KEY_ID,
@@ -63,79 +55,18 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     cw_handler.setFormatter(LogstashFormatterV1())
     logger.addHandler(cw_handler)
 
-DEVMODE = os.getenv('DEV', False)
-
-if not DEVMODE:
-    # Valid topics config
-    VALID_TOPICS = []
-    TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/etc/upload-service/topics.json')
-    with open(TOPIC_CONFIG, 'r') as f:
-        data = f.read().replace("'", '"')
-        topic_config = json.loads(data)
-
-    for topic in topic_config:
-        for name in topic['TOPIC_NAME'].split('.'):
-            VALID_TOPICS.append(name)
+if not config.DEVMODE:
+    VALID_TOPICS = config.get_valid_topics()
 
 # Set Storage driver to use
-storage_driver = os.getenv("STORAGE_DRIVER", "s3")
-storage = import_module("utils.storage.{}".format(storage_driver))
+storage = import_module("utils.storage.{}".format(config.STORAGE_DRIVER))
 
 # Upload content type must match this regex. Third field matches end service
 content_regex = r'^application/vnd\.redhat\.(?P<service>[a-z0-9-]+)\.(?P<category>[a-z0-9-]+).*'
 
-# Items in this map are _special cases_ where the service cannot be extracted
-# from the Content-Type
-SERVICE_MAP = {
-    'application/x-gzip; charset=binary': {
-        'service': 'advisor',
-        'category': 'upload'
-    },
-    'application/vnd.redhat.openshift.periodic': {
-        'service': 'buckit',
-        'category': 'openshift'
-    }
-}
-
-# set max length to 10.5 MB (one MB larger than peak)
-MAX_LENGTH = int(os.getenv('MAX_LENGTH', 11010048))
-LISTEN_PORT = int(os.getenv('LISTEN_PORT', 8888))
-RETRY_INTERVAL = int(os.getenv('RETRY_INTERVAL', 5))  # seconds
-
-# Maximum workers for threaded execution
-MAX_WORKERS = int(os.getenv('MAX_WORKERS', 50))
-
-# Maximum time to wait for an archive to upload to storage
-STORAGE_UPLOAD_TIMEOUT = int(os.getenv('STORAGE_UPLOAD_TIMEOUT', 60))
-
-# dummy values for testing without a real identity
-DUMMY_VALUES = {
-    'principal': 'default_principal',
-    'account': '000001',
-    'payload_id': '1234567890abcdef',
-    'url': 'http://defaulttesturl',
-    'validation': 0,
-    'size': 0
-}
-
-VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
-
-INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
-
-PATH_PREFIX = os.getenv('PATH_PREFIX', '/api/')
-APP_NAME = os.getenv('APP_NAME', 'ingress')
-
-API_PREFIX = PATH_PREFIX + APP_NAME
-
-# Message Queue
-MQ = os.getenv('KAFKAMQ', 'kafka:29092').split(',')
-MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
-
-BUILD_ID = os.getenv('OPENSHIFT_BUILD_COMMIT', 'somemadeupvalue')
-
-kafka_consumer = AIOKafkaConsumer(VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop,
-                                  bootstrap_servers=MQ, group_id=MQ_GROUP_ID)
-kafka_producer = AIOKafkaProducer(loop=IOLoop.current().asyncio_loop, bootstrap_servers=MQ,
+kafka_consumer = AIOKafkaConsumer(config.VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop,
+                                  bootstrap_servers=config.MQ, group_id=config.MQ_GROUP_ID)
+kafka_producer = AIOKafkaProducer(loop=IOLoop.current().asyncio_loop, bootstrap_servers=config.MQ,
                                   request_timeout_ms=10000, connections_max_idle_ms=None)
 CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
 PRODUCER = ReconnectingClient(kafka_producer, "producer")
@@ -144,23 +75,7 @@ PRODUCER = ReconnectingClient(kafka_producer, "producer")
 produce_queue = collections.deque([], 999)
 
 # Executor used to run non-async/blocking tasks
-thread_pool_executor = ThreadPoolExecutor(max_workers=MAX_WORKERS)
-
-# Set up ApiSpec object
-spec = APISpec(
-    title='Insights Upload Service',
-    version='0.0.1',
-    openapi_version='3.0.0',
-    info=dict(
-        description='A service designed to ingest payloads from customers and distribute them via message queue to other platform services.',
-        contact=dict(
-            email='sadams@redhat.com'
-        )
-    ),
-    plugins=[
-        TornadoPlugin()
-    ]
-)
+thread_pool_executor = ThreadPoolExecutor(max_workers=config.MAX_WORKERS)
 
 
 async def defer(*args):
@@ -169,22 +84,10 @@ async def defer(*args):
     mnm.uploads_executor_qsize.set(thread_pool_executor._work_queue.qsize())
     return res
 
-
-def get_commit_date(commit_id):
-    if os.getenv("GITHUB_ACCESS_TOKEN"):
-        headers = {"Authorization": "token %s" % os.getenv("GITHUB_ACCESS_TOKEN")}
-    else:
-        headers = {}
-    BASE_URL = "https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/"
-    response = requests.get(BASE_URL + commit_id, headers=headers)
-    date = response.json()['committer']['date']
-    return date
-
-
-if DEVMODE:
+if config.DEVMODE:
     BUILD_DATE = 'devmode'
 else:
-    BUILD_DATE = get_commit_date(BUILD_ID)
+    BUILD_DATE = config.get_commit_date(config.BUILD_ID)
 
 
 def prepare_facts_for_inventory(facts):
@@ -205,8 +108,8 @@ def get_service(content_type):
     """
     Returns the service that content_type maps to.
     """
-    if content_type in SERVICE_MAP:
-        return SERVICE_MAP[content_type]
+    if content_type in config.SERVICE_MAP:
+        return config.SERVICE_MAP[content_type]
     else:
         m = re.search(content_regex, content_type)
         if m:
@@ -217,7 +120,7 @@ def get_service(content_type):
 async def handle_validation(client):
     data = await client.getmany(timeout_ms=1000, max_records=30)
     for tp, msgs in data.items():
-        if tp.topic == VALIDATION_QUEUE:
+        if tp.topic == config.VALIDATION_QUEUE:
             await handle_file(msgs)
 
 
@@ -325,7 +228,7 @@ async def post_to_inventory(identity, payload_id, values):
     post = json.dumps([post])
     try:
         httpclient = AsyncHTTPClient()
-        response = await httpclient.fetch(INVENTORY_URL, body=post, headers=headers, method="POST")
+        response = await httpclient.fetch(config.INVENTORY_URL, body=post, headers=headers, method="POST")
         body = json.loads(response.body)
         if response.code != 207:
             mnm.uploads_inventory_post_failure.inc()
@@ -345,7 +248,7 @@ async def post_to_inventory(identity, payload_id, values):
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"request_id": payload_id,
                                                                                                 "id": inv_id})
             return inv_id
-    except ConnectionError:
+    except HTTPClientError:
         logger.error("Unable to contact inventory", extra={"request_id": payload_id})
 
 
@@ -407,17 +310,17 @@ class UploadHandler(tornado.web.RequestHandler):
             tuple -- status code and a user friendly message
         """
         content_length = int(self.request.headers["Content-Length"])
-        if content_length >= MAX_LENGTH:
+        if content_length >= config.MAX_LENGTH:
             mnm.uploads_too_large.inc()
-            logger.error("Payload too large. Request ID [%s] - Length %s", self.payload_id, str(MAX_LENGTH), extra={"request_id": self.payload_id})
-            return self.error(413, f"Payload too large: {content_length}. Should not exceed {MAX_LENGTH} bytes")
+            logger.error("Payload too large. Request ID [%s] - Length %s", self.payload_id, str(config.MAX_LENGTH), extra={"request_id": self.payload_id})
+            return self.error(413, f"Payload too large: {content_length}. Should not exceed {config.MAX_LENGTH} bytes")
         try:
             serv_dict = get_service(self.payload_data['content_type'])
         except Exception:
             mnm.uploads_unsupported_filetype.inc()
             logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id})
             return self.error(415, 'Unsupported Media Type')
-        if not DEVMODE and serv_dict["service"] not in VALID_TOPICS:
+        if not config.DEVMODE and serv_dict["service"] not in VALID_TOPICS:
             logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id})
             return self.error(415, 'Unsupported MIME type')
 
@@ -498,8 +401,8 @@ class UploadHandler(tornado.web.RequestHandler):
             values['rh_account'] = self.identity['account_number']
             values['principal'] = self.identity['internal'].get('org_id') if self.identity.get('internal') else None
         else:
-            values['account'] = DUMMY_VALUES['account']
-            values['principal'] = DUMMY_VALUES['principal']
+            values['account'] = config.DUMMY_VALUES['account']
+            values['principal'] = config.DUMMY_VALUES['principal']
         values['payload_id'] = self.payload_id
         values['hash'] = self.payload_id  # provided for backward compatibility
         values['size'] = self.size
@@ -653,7 +556,7 @@ class VersionHandler(tornado.web.RequestHandler):
                                     type: string
                                     example: '2019-03-19T14:17:27Z'
         """
-        response = {'commit': BUILD_ID,
+        response = {'commit': config.BUILD_ID,
                     'date': BUILD_DATE}
         self.write(response)
 
@@ -689,15 +592,15 @@ class SpecHandler(tornado.web.RequestHandler):
             200:
                 description: OK
         """
-        response = spec.to_dict()
+        response = config.spec.to_dict()
         self.write(response)
 
 
 endpoints = [
-    (API_PREFIX, RootHandler),
-    (API_PREFIX + "/v1/version", VersionHandler),
-    (API_PREFIX + "/v1/upload", UploadHandler),
-    (API_PREFIX + "/v1/openapi.json", SpecHandler),
+    (config.API_PREFIX, RootHandler),
+    (config.API_PREFIX + "/v1/version", VersionHandler),
+    (config.API_PREFIX + "/v1/upload", UploadHandler),
+    (config.API_PREFIX + "/v1/openapi.json", SpecHandler),
     (r"/r/insights/platform/upload", RootHandler),
     (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
     (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
@@ -706,14 +609,14 @@ endpoints = [
 ]
 
 for urlSpec in endpoints:
-    spec.path(urlspec=urlSpec)
+    config.spec.path(urlspec=urlSpec)
 
-app = tornado.web.Application(endpoints, max_body_size=MAX_LENGTH)
+app = tornado.web.Application(endpoints, max_body_size=config.MAX_LENGTH)
 
 
 def main():
-    app.listen(LISTEN_PORT)
-    logger.info(f"Web server listening on port {LISTEN_PORT}")
+    app.listen(config.LISTEN_PORT)
+    logger.info(f"Web server listening on port {config.LISTEN_PORT}")
     loop = IOLoop.current()
     loop.set_default_executor(thread_pool_executor)
     loop.spawn_callback(CONSUMER.get_callback(handle_validation))

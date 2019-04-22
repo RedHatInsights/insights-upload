@@ -14,6 +14,7 @@ from re import search
 from kafkahelpers import ReconnectingClient
 
 import app
+from utils import config
 from tests.fixtures.fake_mq import FakeMQ
 from tests.fixtures import StopLoopException
 from utils.storage import s3 as s3_storage
@@ -23,7 +24,7 @@ client = AsyncHTTPClient()
 
 
 def cleanup():
-    sh.rm(app.TOPIC_CONFIG)
+    sh.rm(config.TOPIC_CONFIG)
 
 
 class TestContentRegex(TestCase):
@@ -121,7 +122,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
     @gen_test
     def test_upload_post_file_too_large(self):
-        request_context = self.prepare_request_context(app.MAX_LENGTH + 1, 'payload.tar.gz')
+        request_context = self.prepare_request_context(config.MAX_LENGTH + 1, 'payload.tar.gz')
 
         with self.assertRaises(HTTPClientError) as response:
             yield self.http_client.fetch(
@@ -135,7 +136,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
         self.assertEqual(
             'Payload too large: {content_length}. Should not exceed {max_length} bytes'.format(
                 content_length=str(request_context.headers.get('Content-Length')),
-                max_length=str(app.MAX_LENGTH)
+                max_length=str(config.MAX_LENGTH)
             ), response.exception.message
         )
 
@@ -189,10 +190,10 @@ class TestInventoryPost(object):
 
     @asyncio.coroutine
     @responses.activate
-    @patch("app.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
+    @patch("utils.config.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
     def test_post_to_inventory_success(self):
         values = {"account": "12345", "metadata": {"some_key": "some_value"}}
-        responses.add(responses.POST, app.INVENTORY_URL,
+        responses.add(responses.POST, config.INVENTORY_URL,
                       json={"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}, status=207)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
@@ -202,10 +203,10 @@ class TestInventoryPost(object):
 
     @asyncio.coroutine
     @responses.activate
-    @patch("app.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
+    @patch("utils.config.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
     def test_post_to_inventory_fail(self):
         values = {"account": "12345", "metadata": {"bad_key": "bad_value"}}
-        responses.add(responses.POST, app.INVENTORY_URL,
+        responses.add(responses.POST, config.INVENTORY_URL,
                       json={"data": [{"detail": "boop", "status": 400}]}, status=207)
         method_response = app.post_to_inventory('1234', 'abcd1234', values)
 
@@ -362,7 +363,7 @@ class TestProducerAndConsumer:
             assert mq.trying_to_connect_failures_calls == 0
             assert len(app.produce_queue) == 0
 
-    @patch("app.RETRY_INTERVAL", 0.01)
+    @patch("utils.config.RETRY_INTERVAL", 0.01)
     def test_producer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
@@ -381,7 +382,7 @@ class TestProducerAndConsumer:
             assert mq.disconnect_in_operation_called is True
             assert mq.trying_to_connect_failures_calls == 1
 
-    @patch("app.RETRY_INTERVAL", 0.01)
+    @patch("utils.config.RETRY_INTERVAL", 0.01)
     def test_consumer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
         total_messages = 4
