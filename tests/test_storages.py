@@ -49,7 +49,7 @@ class TestS3(object):
             config.DUMMY_VALUES['account'],
             'curl/7.61.1'
         )
-        copy_file_path = s3_storage.copy(s3_storage.PERM, s3_storage.REJECT, key_name)
+        copy_file_path = s3_storage.copy(s3_storage.PERM, s3_storage.REJECT, key_name, config.DUMMY_VALUES["account"])
 
         def _get_key(r):
             k = r.split('/')[3]
