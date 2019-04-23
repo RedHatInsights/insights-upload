@@ -30,12 +30,13 @@ def write(data, dest, uuid, account, user_agent):
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
                                             'Key': uuid}, ExpiresIn=86400)
-    logger.info("Data written to s3", extra={"request_id": uuid})
+    logger.info("Data written to s3 for payload [%s]", uuid, extra={"request_id": uuid,
+                                                                    "account": account})
     return url
 
 
 @mnm.uploads_s3_copy_seconds.time()
-def copy(src, dest, uuid):
+def copy(src, dest, uuid, account):
     copy_src = {'Bucket': src,
                 'Key': uuid}
     s3.copy(copy_src, dest, uuid)
@@ -43,7 +44,8 @@ def copy(src, dest, uuid):
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
                                             'Key': uuid}, ExpiresIn=86400)
-    logger.info("Data copied to %s bucket", dest, extra={"request_id": uuid})
+    logger.info("Data copied to %s bucket for payload [%s]", dest, uuid, extra={"request_id": uuid,
+                                                                                "account": account})
     return url
 
 
