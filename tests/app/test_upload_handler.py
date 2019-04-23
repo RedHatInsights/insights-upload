@@ -28,22 +28,30 @@ class TestUpload(AsyncHTTPTestCase):
         """
         return app
 
+    @patch("app.UploadHandler.process_upload", wraps=process_upload)  # Must be an async method.
     @patch("app.os.remove")
     @patch("app.logger")
     @patch("utils.storage.localdisk.open")
     @patch("utils.storage.localdisk.os.path.isdir", return_value=True)
+    @patch("app.UploadHandler.write_data", return_value="some_file.tgz")
+    @patch("app.UploadHandler.upload_validation", return_value=False)
     @patch("app.storage", localdisk)
     @gen_test
-    def test_localdisk_write_does_not_fail(self, isdir, open_mock, logger, remove):
+    def test_localdisk_write_does_not_fail(self, isdir, open_mock, logger, remove, process_upload, write_data, upload_validation):
         """
         Calling localdisk.write method does not fail when everything goes right, correct number of values is returned.
         """
         open_mock.return_value = NamedTemporaryFile("w")
-
-        request = Mock()
+        size = 123
+        request = Mock(**{"files": {"upload": [{"content_type": "application/vnd.redhat.testareno.something+tgz",
+                                                "body": ""}]},
+                          "headers": {"Content-Length": size,
+                                      "x-rh-insights-request-id": "test",
+                                      "x-rh-identity": "eyJpZGVudGl0eSI6eyJhY2NvdW50X251bWJlciI6IjAwMDAwMDEifX0="},
+                          "body_arguments": {"metadata": [b'{"machine_id": "12345"}']}})
         handler = UploadHandler(app, request)
 
-        yield handler.upload("some filename", "some tracking_id", "some payload_id")
+        yield handler.post()
 
         logger.exception.assert_not_called()
 
@@ -64,8 +72,9 @@ class TestPost(AsyncHTTPTestCase):
         size = 123
         request = Mock(**{"files": {"upload": [{"content_type": "application/vnd.redhat.testareno.something+tgz",
                                                 "body": ""}]},
-                                    "headers": {"Content-Length": size,
-                                                "x-rh-insights-request-id": "test"},
+                          "headers": {"Content-Length": size,
+                                      "x-rh-insights-request-id": "test",
+                                      "x-rh-identity": "eyJpZGVudGl0eSI6eyJhY2NvdW50X251bWJlciI6IjAwMDAwMDEifX0="},
                           "body_arguments": {"metadata": [b'{"machine_id": "12345"}']}})
         handler = UploadHandler(app, request)
 
