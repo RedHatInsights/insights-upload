@@ -135,16 +135,18 @@ def make_preprocessor(queue=None):
             topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
             logger.info(
                 "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
-                len(queue), topic, payload_id, msg
+                len(queue), topic, payload_id, msg, extra={"request_id": payload_id, "account": msg["account"]}
             )
             try:
                 await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
-                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra={"request_id": payload_id})
+                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra={"request_id": payload_id,
+                                                                                                                 "account": msg["account"]})
             except KafkaError:
                 queue.append(item)
                 logger.error(
                     "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
-                    topic, payload_id, len(queue), extra={"request_id": payload_id}
+                    topic, payload_id, len(queue), extra={"request_id": payload_id,
+                                                          "account": msg["account"]}
                 )
                 raise
     return send_to_preprocessors
@@ -175,7 +177,8 @@ async def handle_file(msgs):
         payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
         result = data.get('validation')
 
-        logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id})
+        logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id,
+                                                                                        "account": data["account"]})
 
         r = await defer(storage.ls, storage.PERM, payload_id)
 
@@ -202,20 +205,25 @@ async def handle_file(msgs):
                 produce_queue.append(data)
                 logger.info(
                     "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
-                    data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id}
+                    data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id,
+                                                                          "account": data["msg"]["account"]}
                 )
                 logger.debug("payload_id [%s] data: %s", payload_id, data)
             elif result.lower() == 'failure':
                 mnm.uploads_invalidated.inc()
-                logger.info('payload_id [%s] rejected', payload_id)
-                url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id)
+                logger.info('payload_id [%s] rejected', payload_id, extra={"request_id": payload_id,
+                                                                           "account": data["account"]})
+                url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, data["account"])
             elif result.lower() == 'handoff':
                 mnm.uploads_handed_off.inc()
-                logger.info('payload_id [%s] handed off', payload_id)
+                logger.info('payload_id [%s] handed off', payload_id, extra={"request_id": payload_id,
+                                                                             "account": data["account"]})
             else:
-                logger.info('Unrecognized result: %s', result.lower())
+                logger.info('Unrecognized result: %s', result.lower(), extra={"request_id": payload_id,
+                                                                              "account": data["account"]})
         else:
-            logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id})
+            logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id,
+                                                                                            "account": data["account"]})
 
 
 async def post_to_inventory(identity, payload_id, values):
@@ -233,23 +241,29 @@ async def post_to_inventory(identity, payload_id, values):
         if response.code != 207:
             mnm.uploads_inventory_post_failure.inc()
             error = body.get('detail')
-            logger.error('Failed to post to inventory: %s', error, extra={"request_id": payload_id})
-            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id})
+            logger.error('Failed to post to inventory: %s', error, extra={"request_id": payload_id,
+                                                                          "account": post["account"]})
+            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id,
+                                                                            "account": post["account"]})
             return None
         elif body['data'][0]['status'] != 200 and body['data'][0]['status'] != 201:
             mnm.uploads_inventory_post_failure.inc()
             error = body['data'][0].get('detail')
-            logger.error('Failed to post to inventory: ' + error, extra={"request_id": payload_id})
-            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id})
+            logger.error('Failed to post to inventory: ' + error, extra={"request_id": payload_id,
+                                                                         "account": post["account"]})
+            logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id,
+                                                                            "account": post["account"]})
             return None
         else:
             mnm.uploads_inventory_post_success.inc()
             inv_id = body['data'][0]['host']['id']
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"request_id": payload_id,
-                                                                                                "id": inv_id})
+                                                                                                "id": inv_id,
+                                                                                                "account": post["account"]})
             return inv_id
     except HTTPClientError:
-        logger.error("Unable to contact inventory", extra={"request_id": payload_id})
+        logger.error("Unable to contact inventory", extra={"request_id": payload_id,
+                                                           "account": post["account"]})
 
 
 class NoAccessLog(tornado.web.RequestHandler):
@@ -339,7 +353,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
-    async def upload(self, filename, tracking_id, payload_id):
+    async def upload(self, filename, tracking_id, payload_id, identity):
         """Write the payload to the configured storage
 
         Storage write and os file operations are not async so we offload to executor.
@@ -354,12 +368,12 @@ class UploadHandler(tornado.web.RequestHandler):
             str -- URL of uploaded file if successful
             None if upload failed
         """
-
-        upload_start = time()
-        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"request_id": payload_id})
-
         account = self.identity.get("account_number")
         user_agent = self.request.headers.get("User-Agent")
+
+        upload_start = time()
+        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra={"request_id": payload_id,
+                                                                                                          "account": account})
         try:
             url = await defer(storage.write, filename, storage.PERM, payload_id,
                               account, user_agent)
@@ -367,7 +381,8 @@ class UploadHandler(tornado.web.RequestHandler):
 
             logger.info(
                 "tracking id [%s] payload_id [%s] uploaded! elapsed [%fsec] url [%s]",
-                tracking_id, payload_id, elapsed, url, extra={"request_id": payload_id}
+                tracking_id, payload_id, elapsed, url, extra={"request_id": payload_id,
+                                                              "account": account}
             )
 
             return url
@@ -375,7 +390,7 @@ class UploadHandler(tornado.web.RequestHandler):
             elapsed = time() - upload_start
             logger.exception(
                 "Exception hit uploading: tracking id [%s] payload_id [%s] elapsed [%fsec]",
-                tracking_id, payload_id, elapsed, extra={"request_id": payload_id}
+                tracking_id, payload_id, elapsed, extra={"request_id": payload_id, "account": account}
             )
         finally:
             await defer(os.remove, filename)
@@ -414,7 +429,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['id'] = await post_to_inventory(self.b64_identity, self.payload_id, values)
             del values['metadata']
 
-        url = await self.upload(self.filename, self.tracking_id, self.payload_id)
+        url = await self.upload(self.filename, self.tracking_id, self.payload_id, self.identity)
 
         if url:
             values['url'] = url
@@ -422,7 +437,8 @@ class UploadHandler(tornado.web.RequestHandler):
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
-                self.payload_id, topic, len(produce_queue), extra={"request_id": self.payload_id}
+                self.payload_id, topic, len(produce_queue), extra={"request_id": self.payload_id,
+                                                                   "account": values["account"]}
             )
 
     @mnm.uploads_write_tarfile.time()
