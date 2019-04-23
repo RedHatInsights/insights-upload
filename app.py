@@ -242,28 +242,28 @@ async def post_to_inventory(identity, payload_id, values):
             mnm.uploads_inventory_post_failure.inc()
             error = body.get('detail')
             logger.error('Failed to post to inventory: %s', error, extra={"request_id": payload_id,
-                                                                          "account": post["account"]})
+                                                                          "account": values["account"]})
             logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id,
-                                                                            "account": post["account"]})
+                                                                            "account": values["account"]})
             return None
         elif body['data'][0]['status'] != 200 and body['data'][0]['status'] != 201:
             mnm.uploads_inventory_post_failure.inc()
             error = body['data'][0].get('detail')
             logger.error('Failed to post to inventory: ' + error, extra={"request_id": payload_id,
-                                                                         "account": post["account"]})
+                                                                         "account": values["account"]})
             logger.debug('Host data that failed to post: %s' % post, extra={"request_id": payload_id,
-                                                                            "account": post["account"]})
+                                                                            "account": values["account"]})
             return None
         else:
             mnm.uploads_inventory_post_success.inc()
             inv_id = body['data'][0]['host']['id']
             logger.info('Payload [%s] posted to inventory. ID [%s]', payload_id, inv_id, extra={"request_id": payload_id,
                                                                                                 "id": inv_id,
-                                                                                                "account": post["account"]})
+                                                                                                "account": values["account"]})
             return inv_id
     except HTTPClientError:
         logger.error("Unable to contact inventory", extra={"request_id": payload_id,
-                                                           "account": post["account"]})
+                                                           "account": values["account"]})
 
 
 class NoAccessLog(tornado.web.RequestHandler):
