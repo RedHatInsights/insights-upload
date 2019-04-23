@@ -121,7 +121,7 @@ async def handle_validation(client):
     data = await client.getmany(timeout_ms=1000, max_records=30)
     for tp, msgs in data.items():
         if tp.topic == config.VALIDATION_QUEUE:
-            await handle_file(msgs)
+            await asyncio.gather(*[handle_file(msg) for msg in msgs])
 
 
 def make_preprocessor(queue=None):
@@ -153,7 +153,7 @@ def make_preprocessor(queue=None):
 
 
 @prom_time(mnm.uploads_handle_file_seconds)
-async def handle_file(msgs):
+async def handle_file(msg):
     """Determine which bucket to put a payload in based on the message
        returned from the validating service.
 
@@ -162,68 +162,67 @@ async def handle_file(msgs):
     Arguments:
         msgs -- list of kafka messages consumed on validation topic
     """
-    for msg in msgs:
-        try:
-            data = json.loads(msg.value)
-        except ValueError:
-            logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value))
-            continue
+    try:
+        data = json.loads(msg.value)
+    except ValueError:
+        logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value))
+        return
 
-        if 'payload_id' not in data and 'hash' not in data:
-            logger.error("payload_id or hash not in message. Payload not removed from permanent.")
-            continue
+    if 'payload_id' not in data and 'hash' not in data:
+        logger.error("payload_id or hash not in message. Payload not removed from permanent.")
+        return
 
-        # get the payload_id. Getting the hash is temporary until consumers update
-        payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
-        result = data.get('validation')
+    # get the payload_id. Getting the hash is temporary until consumers update
+    payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
+    result = data.get('validation')
 
-        logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id,
-                                                                                        "account": data["account"]})
+    logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id,
+                                                                                    "account": data["account"]})
 
-        r = await defer(storage.ls, storage.PERM, payload_id)
+    r = await defer(storage.ls, storage.PERM, payload_id)
 
-        if r['ResponseMetadata']['HTTPStatusCode'] == 200:
-            if result.lower() == 'success':
-                mnm.uploads_validated.inc()
+    if r['ResponseMetadata']['HTTPStatusCode'] == 200:
+        if result.lower() == 'success':
+            mnm.uploads_validated.inc()
 
-                url = await defer(storage.get_url, storage.PERM, payload_id)
-                data = {
-                    'topic': 'platform.upload.available',
-                    'msg': {
-                        'id': data.get('id'),
-                        'url': url,
-                        'service': data.get('service'),
-                        'payload_id': payload_id,
-                        'account': data.get('account'),
-                        'principal': data.get('principal'),
-                        'b64_identity': data.get('b64_identity'),
-                        'satellite_managed': data.get('satellite_managed'),
-                        'rh_account': data.get('account'),  # deprecated key, temp for backward compatibility
-                        'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
-                    }
+            url = await defer(storage.get_url, storage.PERM, payload_id)
+            data = {
+                'topic': 'platform.upload.available',
+                'msg': {
+                    'id': data.get('id'),
+                    'url': url,
+                    'service': data.get('service'),
+                    'payload_id': payload_id,
+                    'account': data.get('account'),
+                    'principal': data.get('principal'),
+                    'b64_identity': data.get('b64_identity'),
+                    'satellite_managed': data.get('satellite_managed'),
+                    'rh_account': data.get('account'),  # deprecated key, temp for backward compatibility
+                    'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
                 }
-                produce_queue.append(data)
-                logger.info(
-                    "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
-                    data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id,
-                                                                          "account": data["msg"]["account"]}
-                )
-                logger.debug("payload_id [%s] data: %s", payload_id, data)
-            elif result.lower() == 'failure':
-                mnm.uploads_invalidated.inc()
-                logger.info('payload_id [%s] rejected', payload_id, extra={"request_id": payload_id,
-                                                                           "account": data["account"]})
-                url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, data["account"])
-            elif result.lower() == 'handoff':
-                mnm.uploads_handed_off.inc()
-                logger.info('payload_id [%s] handed off', payload_id, extra={"request_id": payload_id,
-                                                                             "account": data["account"]})
-            else:
-                logger.info('Unrecognized result: %s', result.lower(), extra={"request_id": payload_id,
-                                                                              "account": data["account"]})
+            }
+            produce_queue.append(data)
+            logger.info(
+                "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
+                data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id,
+                                                                      "account": data["msg"]["account"]}
+            )
+            logger.debug("payload_id [%s] data: %s", payload_id, data)
+        elif result.lower() == 'failure':
+            mnm.uploads_invalidated.inc()
+            logger.info('payload_id [%s] rejected', payload_id, extra={"request_id": payload_id,
+                                                                       "account": data["account"]})
+            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, data["account"])
+        elif result.lower() == 'handoff':
+            mnm.uploads_handed_off.inc()
+            logger.info('payload_id [%s] handed off', payload_id, extra={"request_id": payload_id,
+                                                                         "account": data["account"]})
         else:
-            logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id,
-                                                                                            "account": data["account"]})
+            logger.info('Unrecognized result: %s', result.lower(), extra={"request_id": payload_id,
+                                                                          "account": data["account"]})
+    else:
+        logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id,
+                                                                                        "account": data["account"]})
 
 
 async def post_to_inventory(identity, payload_id, values):
