@@ -137,20 +137,21 @@ def make_preprocessor(queue=None):
         else:
             item = queue.popleft()
             topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
+            account = msg.get("account", "unknown")
             logger.info(
                 "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
-                len(queue), topic, payload_id, msg, extra={"request_id": payload_id, "account": msg["account"]}
+                len(queue), topic, payload_id, msg, extra={"request_id": payload_id, "account": account}
             )
             try:
                 await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
                 logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra={"request_id": payload_id,
-                                                                                                                 "account": msg["account"]})
+                                                                                                                 "account": account})
             except KafkaError:
                 queue.append(item)
                 logger.error(
                     "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
                     topic, payload_id, len(queue), extra={"request_id": payload_id,
-                                                          "account": msg["account"]}
+                                                          "account": account}
                 )
                 raise
     return send_to_preprocessors
@@ -179,7 +180,7 @@ async def handle_file(msg):
 
     # get the payload_id. Getting the hash is temporary until consumers update
     payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
-    result = data.get('validation')
+    result = data.get('validation', 'unknown')
     account = data.get('account', 'unknown')
 
     logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id,
