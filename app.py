@@ -42,6 +42,10 @@ else:
     )
 
 logger = logging.getLogger('upload-service')
+tornado_gen_logs = logging.getLogger('tornado.general')
+tornado_app_logs = logging.getLogger('tornado.application')
+tornado_gen_logs.setLevel('ERROR')
+tornado_app_logs.setLevel('ERROR')
 
 NAMESPACE = config.get_namespace()
 
@@ -54,6 +58,8 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
                                                  stream_name=NAMESPACE)
     cw_handler.setFormatter(LogstashFormatterV1())
     logger.addHandler(cw_handler)
+    tornado_gen_logs.addHandler(cw_handler)
+    tornado_app_logs.addHandler(cw_handler)
 
 if not config.DEVMODE:
     VALID_TOPICS = config.get_valid_topics()
