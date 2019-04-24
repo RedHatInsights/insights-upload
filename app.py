@@ -42,12 +42,13 @@ else:
     )
 
 logger = logging.getLogger('upload-service')
-tornado_gen_logs = logging.getLogger('tornado.general')
-tornado_app_logs = logging.getLogger('tornado.application')
-tornado_gen_logs.setLevel('ERROR')
-tornado_app_logs.setLevel('ERROR')
-
-NAMESPACE = config.get_namespace()
+other_loggers = (logging.getLogger(n) for n in (
+    'tornado.general',
+    'tornado.application',
+    'kafkahelpers',
+))
+for l in other_loggers:
+    l.setLevel('ERROR')
 
 if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     CW_SESSION = Session(aws_access_key_id=config.CW_AWS_ACCESS_KEY_ID,
@@ -57,10 +58,10 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
                                                  log_group="platform",
                                                  stream_name=NAMESPACE)
     cw_handler.setFormatter(LogstashFormatterV1())
-    logger.addHandler(cw_handler)
-    tornado_gen_logs.addHandler(cw_handler)
-    tornado_app_logs.addHandler(cw_handler)
+    for l in (logger, *other_loggers):
+        l.addHandler(cw_handler)
 
+NAMESPACE = config.get_namespace()
 if not config.DEVMODE:
     VALID_TOPICS = config.get_valid_topics()
 
@@ -141,15 +142,26 @@ def make_preprocessor(queue=None):
         if not queue:
             await asyncio.sleep(0.1)
         else:
-            item = queue.popleft()
-            topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
+            try:
+                item = queue.popleft()
+            except Exception:
+                logger.exception("Failed to popleft")
+                return
+
+            try:
+                topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
+            except Exception:
+                logger.exception("Bad data from produce_queue.", extra={"item": item})
+                return
+
             account = msg.get("account", "unknown")
             logger.info(
                 "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
                 len(queue), topic, payload_id, msg, extra={"request_id": payload_id, "account": account}
             )
             try:
-                await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
+                with mnm.uploads_send_and_wait_seconds.time():
+                    await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
                 logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra={"request_id": payload_id,
                                                                                                                  "account": account})
             except KafkaError:
@@ -160,6 +172,14 @@ def make_preprocessor(queue=None):
                                                           "account": account}
                 )
                 raise
+            except Exception:
+                logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
+                                 extra={
+                                     "request_id": payload_id,
+                                     "account": account,
+                                     "msg": msg
+                                 })
+
     return send_to_preprocessors
 
 
