@@ -169,7 +169,7 @@ async def handle_file(msg):
     """
     try:
         data = json.loads(msg.value)
-        logger.debug("handling_data: %s", data)
+        logger.info("handling_data: %s", data)
     except ValueError:
         logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value))
         return
