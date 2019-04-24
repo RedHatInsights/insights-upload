@@ -119,13 +119,12 @@ def get_service(content_type):
 
 async def handle_validation(client):
     data = await client.getmany(timeout_ms=1000, max_records=30)
-    logger.debug("Got messages for %s topics from consumer client.", len(data))
     for tp, msgs in data.items():
-        logger.debug("Got %s messages from topic [%s]", len(msgs), tp.topic)
         if tp.topic == config.VALIDATION_QUEUE:
             logger.info("Processing %s messages from topic [%s]", len(msgs), tp.topic, extra={
                 "topic": tp.topic
             })
+            # TODO: Figure out how to properly handle failures
             await asyncio.gather(*[handle_file(msg) for msg in msgs])
 
 
@@ -181,9 +180,10 @@ async def handle_file(msg):
     # get the payload_id. Getting the hash is temporary until consumers update
     payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
     result = data.get('validation')
+    account = data.get('account', 'unknown')
 
     logger.info('processing message: payload [%s] - %s', payload_id, result, extra={"request_id": payload_id,
-                                                                                    "account": data["account"]})
+                                                                                    "account": account})
 
     r = await defer(storage.ls, storage.PERM, payload_id)
 
@@ -211,24 +211,24 @@ async def handle_file(msg):
             logger.info(
                 "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
                 data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id,
-                                                                      "account": data["msg"]["account"]}
+                                                                      "account": account}
             )
             logger.debug("payload_id [%s] data: %s", payload_id, data)
         elif result.lower() == 'failure':
             mnm.uploads_invalidated.inc()
             logger.info('payload_id [%s] rejected', payload_id, extra={"request_id": payload_id,
-                                                                       "account": data["account"]})
-            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, data["account"])
+                                                                       "account": account})
+            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, account)
         elif result.lower() == 'handoff':
             mnm.uploads_handed_off.inc()
             logger.info('payload_id [%s] handed off', payload_id, extra={"request_id": payload_id,
-                                                                         "account": data["account"]})
+                                                                         "account": account})
         else:
             logger.info('Unrecognized result: %s', result.lower(), extra={"request_id": payload_id,
-                                                                          "account": data["account"]})
+                                                                          "account": account})
     else:
         logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra={"request_id": payload_id,
-                                                                                        "account": data["account"]})
+                                                                                        "account": account})
 
 
 async def post_to_inventory(identity, payload_id, values):
