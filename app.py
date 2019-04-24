@@ -119,7 +119,9 @@ def get_service(content_type):
 
 async def handle_validation(client):
     data = await client.getmany(timeout_ms=1000, max_records=30)
+    logger.debug("Got messages for %s topics from consumer client.", len(data))
     for tp, msgs in data.items():
+        logger.debug("Got %s messages from topic [%s]", len(msgs), tp.topic)
         if tp.topic == config.VALIDATION_QUEUE:
             logger.info("Processing %s messages from topic [%s]", len(msgs), tp.topic, extra={
                 "topic": tp.topic
