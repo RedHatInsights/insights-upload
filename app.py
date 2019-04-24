@@ -63,7 +63,6 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     for l in (logger, *other_loggers):
         l.addHandler(cw_handler)
 
-NAMESPACE = config.get_namespace()
 if not config.DEVMODE:
     VALID_TOPICS = config.get_valid_topics()
 
