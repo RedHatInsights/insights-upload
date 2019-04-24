@@ -28,6 +28,8 @@ uploads_inventory_post_success = Counter('uploads_inventory_post_success', 'The 
 uploads_write_tarfile = Summary('uploads_write_tarfile_seconds', 'Total seconds it takes to write the tarfile upon upload')
 uploads_post_time = Summary('uploads_total_post_seconds', 'Total time it takes to post to upload service')
 uploads_handle_file_seconds = Summary('uploads_handle_file_seconds', 'Total time to handle files once validated by end service')
+uploads_send_and_wait_seconds = Summary('uploads_send_and_wait_seconds', 'Total time spend in send_and_wait')
+ 
 
 # Non Async Functions
 uploads_s3_copy_seconds = Summary('uploads_s3_copy_seconds', 'Total time to copy a file from bucket to bucket')
