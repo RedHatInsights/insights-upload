@@ -50,6 +50,8 @@ other_loggers = (logging.getLogger(n) for n in (
 for l in other_loggers:
     l.setLevel('ERROR')
 
+NAMESPACE = config.get_namespace()
+
 if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     CW_SESSION = Session(aws_access_key_id=config.CW_AWS_ACCESS_KEY_ID,
                          aws_secret_access_key=config.CW_AWS_SECRET_ACCESS_KEY,
@@ -61,7 +63,6 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     for l in (logger, *other_loggers):
         l.addHandler(cw_handler)
 
-NAMESPACE = config.get_namespace()
 if not config.DEVMODE:
     VALID_TOPICS = config.get_valid_topics()
 
