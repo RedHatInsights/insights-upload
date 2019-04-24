@@ -121,6 +121,9 @@ async def handle_validation(client):
     data = await client.getmany(timeout_ms=1000, max_records=30)
     for tp, msgs in data.items():
         if tp.topic == config.VALIDATION_QUEUE:
+            logger.info("Processing %s messages from topic [%s]", len(msgs), tp.topic, extra={
+                "topic": tp.topic
+            })
             await asyncio.gather(*[handle_file(msg) for msg in msgs])
 
 
