@@ -246,9 +246,9 @@ async def handle_file(msg):
             }
             produce_queue.append(data)
             logger.info(
-                "data for topic [%s], payload_id [%s] put on produce queue (qsize now: %d)",
-                data['topic'], payload_id, len(produce_queue), extra={"request_id": payload_id,
-                                                                      "account": account}
+                "data for topic [%s], payload_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
+                data['topic'], payload_id, data["msg"].get("id"), len(produce_queue), extra={"request_id": payload_id,
+                                                                                             "account": account}
             )
             logger.debug("payload_id [%s] data: %s", payload_id, data)
         elif result.lower() == 'failure':
