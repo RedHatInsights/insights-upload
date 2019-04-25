@@ -29,7 +29,10 @@ uploads_write_tarfile = Summary('uploads_write_tarfile_seconds', 'Total seconds 
 uploads_post_time = Summary('uploads_total_post_seconds', 'Total time it takes to post to upload service')
 uploads_handle_file_seconds = Summary('uploads_handle_file_seconds', 'Total time to handle files once validated by end service')
 uploads_send_and_wait_seconds = Summary('uploads_send_and_wait_seconds', 'Total time spend in send_and_wait')
- 
+uploads_json_loads = Summary("uploads_json_loads", "Time spent executing json.loads", ["key"])
+uploads_json_dumps = Summary("uploads_json_dumps", "Time spent executing json.dumps", ["key"])
+uploads_run_in_executor = Summary("uploads_run_in_executor", "Time spent waiting on executor", ["function"])
+uploads_httpclient_fetch_seconds = Summary("uploads_httpclient_fetch_seconds", "Time spent waiting on httpclient fetch", ["url"])
 
 # Non Async Functions
 uploads_s3_copy_seconds = Summary('uploads_s3_copy_seconds', 'Total time to copy a file from bucket to bucket')
@@ -39,6 +42,7 @@ uploads_s3_get_url_seconds = Summary('upload_s3_get_url_seconds', 'Total time to
 
 # threadpool metrics
 uploads_executor_qsize = Gauge("uploads_executor_qsize", "Approximate number of items in the executor queue")
+uploads_produce_queue_size = Gauge("uploads_produce_queue_size", "Number of items in the produce queue")
 
 logger = logging.getLogger(__name__)
 
