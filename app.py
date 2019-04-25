@@ -81,16 +81,22 @@ PRODUCER = ReconnectingClient(kafka_producer, "producer")
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque([], 999)
+mnm.uploads_produce_queue_size.set_function(lambda: len(produce_queue))
 
 # Executor used to run non-async/blocking tasks
 thread_pool_executor = ThreadPoolExecutor(max_workers=config.MAX_WORKERS)
+mnm.uploads_executor_qsize.set_function(lambda: thread_pool_executor._work_queue.qsize())
 
 
 async def defer(*args):
-    mnm.uploads_executor_qsize.set(thread_pool_executor._work_queue.qsize())
-    res = await IOLoop.current().run_in_executor(None, *args)
-    mnm.uploads_executor_qsize.set(thread_pool_executor._work_queue.qsize())
-    return res
+    try:
+        name = args[0].__name__
+    except Exception:
+        name = "unknown"
+
+    with mnm.uploads_run_in_executor.labels(function=name).time():
+        return await IOLoop.current().run_in_executor(None, *args)
+
 
 if config.DEVMODE:
     BUILD_DATE = 'devmode'
@@ -161,8 +167,10 @@ def make_preprocessor(queue=None):
                 len(queue), topic, payload_id, msg, extra={"request_id": payload_id, "account": account}
             )
             try:
+                with mnm.uploads_json_dumps.labels(key="send_to_preprocessors").time():
+                    data = json.dumps(msg)
                 with mnm.uploads_send_and_wait_seconds.time():
-                    await client.send_and_wait(topic, json.dumps(msg).encode("utf-8"))
+                    await client.send_and_wait(topic, data.encode("utf-8"))
                 logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra={"request_id": payload_id,
                                                                                                                  "account": account})
             except KafkaError:
@@ -195,9 +203,10 @@ async def handle_file(msg):
         msgs -- list of kafka messages consumed on validation topic
     """
     try:
-        data = json.loads(msg.value)
+        with mnm.uploads_json_loads.labels(key="handle_file").time():
+            data = json.loads(msg.value)
         logger.info("handling_data: %s", data)
-    except ValueError:
+    except Exception:
         logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value))
         return
 
@@ -266,11 +275,14 @@ async def post_to_inventory(identity, payload_id, values):
                }
     post = prepare_facts_for_inventory(values['metadata'])
     post['account'] = values['account']
-    post = json.dumps([post])
+    with mnm.uploads_json_dumps.labels(key="post_to_inventory").time():
+        post = json.dumps([post])
     try:
         httpclient = AsyncHTTPClient()
-        response = await httpclient.fetch(config.INVENTORY_URL, body=post, headers=headers, method="POST")
-        body = json.loads(response.body)
+        with mnm.uploads_httpclient_fetch_seconds.labels(url=config.INVENTORY_URL).time():
+            response = await httpclient.fetch(config.INVENTORY_URL, body=post, headers=headers, method="POST")
+        with mnm.uploads_json_loads.labels(key="post_to_inventory").time():
+            body = json.loads(response.body)
         if response.code != 207:
             mnm.uploads_inventory_post_failure.inc()
             error = body.get('detail')
@@ -295,8 +307,8 @@ async def post_to_inventory(identity, payload_id, values):
                                                                                                 "account": values["account"]})
             return inv_id
     except HTTPClientError:
-        logger.error("Unable to contact inventory", extra={"request_id": payload_id,
-                                                           "account": values["account"]})
+        logger.exception("Unable to contact inventory", extra={"request_id": payload_id,
+                                                               "account": values["account"]})
 
 
 class NoAccessLog(tornado.web.RequestHandler):
@@ -365,7 +377,7 @@ class UploadHandler(tornado.web.RequestHandler):
             serv_dict = get_service(self.payload_data['content_type'])
         except Exception:
             mnm.uploads_unsupported_filetype.inc()
-            logger.error("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id})
+            logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id})
             return self.error(415, 'Unsupported Media Type')
         if not config.DEVMODE and serv_dict["service"] not in VALID_TOPICS:
             logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra={"request_id": self.payload_id})
@@ -458,7 +470,8 @@ class UploadHandler(tornado.web.RequestHandler):
         values['category'] = self.category
         values['b64_identity'] = self.b64_identity
         if self.metadata:
-            values['metadata'] = json.loads(self.metadata)
+            with mnm.uploads_json_loads.labels(key="process_upload").time():
+                values['metadata'] = json.loads(self.metadata)
             values['id'] = await post_to_inventory(self.b64_identity, self.payload_id, values)
             del values['metadata']
 
@@ -545,7 +558,8 @@ class UploadHandler(tornado.web.RequestHandler):
             self.service = service_dict["service"]
             self.category = service_dict["category"]
             if self.request.headers.get('x-rh-identity'):
-                header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
+                with mnm.uploads_json_loads.labels(key="post").time():
+                    header = json.loads(base64.b64decode(self.request.headers['x-rh-identity']))
                 self.identity = header['identity']
                 self.b64_identity = self.request.headers['x-rh-identity']
             self.size = int(self.request.headers['Content-Length'])
