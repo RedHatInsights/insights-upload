@@ -222,8 +222,10 @@ async def handle_file(msg):
 
     # get the payload_id. Getting the hash is temporary until consumers update
     payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
+    request_id.set(payload_id)
+
     result = data.get('validation', 'unknown')
-    account = data.get('account', 'unknown')
+    account.set(data.get('account', 'unknown'))
 
     logger.info('processing message: payload [%s] - %s', payload_id, result)
 
@@ -241,11 +243,11 @@ async def handle_file(msg):
                     'url': url,
                     'service': data.get('service'),
                     'payload_id': payload_id,
-                    'account': data.get('account'),
+                    'account': account.get(),
                     'principal': data.get('principal'),
                     'b64_identity': data.get('b64_identity'),
                     'satellite_managed': data.get('satellite_managed'),
-                    'rh_account': data.get('account'),  # deprecated key, temp for backward compatibility
+                    'rh_account': account.get(),  # deprecated key, temp for backward compatibility
                     'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
                 }
             }
@@ -257,7 +259,7 @@ async def handle_file(msg):
         elif result.lower() == 'failure':
             mnm.uploads_invalidated.inc()
             logger.info('payload_id [%s] rejected', payload_id)
-            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, account)
+            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, account.get())
         elif result.lower() == 'handoff':
             mnm.uploads_handed_off.inc()
             logger.info('payload_id [%s] handed off', payload_id)
