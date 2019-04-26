@@ -174,6 +174,8 @@ def make_preprocessor(queue=None):
 
             try:
                 topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
+                account.set(msg["account"])
+                request_id.set(payload_id)
                 mnm.uploads_popped_to_topic.labels(topic=topic).inc()
             except Exception:
                 logger.exception("Bad data from produce_queue.", extra={"item": item})
