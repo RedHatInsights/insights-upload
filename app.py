@@ -36,8 +36,8 @@ container = str(uuid.uuid4())
 class ContextFilter(logging.Filter):
 
     def filter(self, record):
-        record.account = account.get()
-        record.request_id = request_id.get()
+        record.account = getattr(record, "account", account.get())
+        record.request_id = getattr(record, "request_id", request_id.get())
         record.container = container
         return True
 
