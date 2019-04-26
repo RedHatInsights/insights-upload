@@ -448,6 +448,8 @@ class UploadHandler(tornado.web.RequestHandler):
 
         Write to storage, send message to MQ
         """
+        account.set(self.account)
+        request_id.set(self.payload_id)
         values = {}
         # use dummy values for now if no account given
         if self.identity:
@@ -531,7 +533,8 @@ class UploadHandler(tornado.web.RequestHandler):
             with mnm.uploads_json_loads.labels(key="post").time():
                 header = json.loads(base64.b64decode(self.b64_identity))
             self.identity = header['identity']
-            account.set(self.identity["account_number"])
+            self.account = self.identity["account_number"]
+            account.set(self.account)
 
         if not self.request.files.get('upload') and not self.request.files.get('file'):
             return self.error(
