@@ -95,7 +95,7 @@ CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
 PRODUCER = ReconnectingClient(kafka_producer, "producer")
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
-produce_queue = collections.deque([], 999)
+produce_queue = collections.deque()
 mnm.uploads_produce_queue_size.set_function(lambda: len(produce_queue))
 
 # Executor used to run non-async/blocking tasks
@@ -172,6 +172,7 @@ def make_preprocessor(queue=None):
 
             try:
                 topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
+                mnm.uploads_popped_to_topic.labels(topic=topic).inc()
             except Exception:
                 logger.exception("Bad data from produce_queue.", extra={"item": item})
                 return
@@ -251,6 +252,7 @@ async def handle_file(msg):
                     'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
                 }
             }
+            mnm.uploads_produced_to_topic.labels(topic="platform.upload.available").inc()
             produce_queue.append(data)
             logger.info(
                 "data for topic [%s], payload_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
@@ -468,6 +470,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if url:
             values['url'] = url
             topic = 'platform.upload.' + self.service
+            mnm.uploads_produced_to_topic.labels(topic=topic).inc()
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
