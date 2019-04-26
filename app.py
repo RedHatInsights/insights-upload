@@ -56,11 +56,11 @@ else:
     )
 
 logger = logging.getLogger('upload-service')
-other_loggers = (logging.getLogger(n) for n in (
+other_loggers = [logging.getLogger(n) for n in (
     'tornado.general',
     'tornado.application',
     'kafkahelpers',
-))
+)]
 for l in other_loggers:
     l.setLevel('ERROR')
 
