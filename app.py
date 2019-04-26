@@ -162,6 +162,7 @@ def make_preprocessor(queue=None):
 
     async def send_to_preprocessors(client):
         if not queue:
+            logger.error("No queue established for send_to_preprocessors")
             await asyncio.sleep(0.1)
         else:
             try:
