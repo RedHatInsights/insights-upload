@@ -63,6 +63,8 @@ other_loggers = (logging.getLogger(n) for n in (
 ))
 for l in other_loggers:
     l.setLevel('ERROR')
+
+for l in (logger, *other_loggers):
     l.addFilter(ContextFilter())
 
 NAMESPACE = config.get_namespace()
