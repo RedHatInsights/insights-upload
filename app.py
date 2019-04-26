@@ -36,8 +36,8 @@ container = str(uuid.uuid4())
 class ContextFilter(logging.Filter):
 
     def filter(self, record):
-        record.account = account.get()
-        record.request_id = request_id.get()
+        record.account = getattr(record, "account", account.get())
+        record.request_id = getattr(record, "request_id", request_id.get())
         record.container = container
         return True
 
@@ -56,13 +56,15 @@ else:
     )
 
 logger = logging.getLogger('upload-service')
-other_loggers = (logging.getLogger(n) for n in (
+other_loggers = [logging.getLogger(n) for n in (
     'tornado.general',
     'tornado.application',
     'kafkahelpers',
-))
+)]
 for l in other_loggers:
     l.setLevel('ERROR')
+
+for l in (logger, *other_loggers):
     l.addFilter(ContextFilter())
 
 NAMESPACE = config.get_namespace()
@@ -172,6 +174,8 @@ def make_preprocessor(queue=None):
 
             try:
                 topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
+                account.set(msg["account"])
+                request_id.set(payload_id)
                 mnm.uploads_popped_to_topic.labels(topic=topic).inc()
             except Exception:
                 logger.exception("Bad data from produce_queue.", extra={"item": item})
