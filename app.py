@@ -194,7 +194,7 @@ def make_preprocessor(queue=None):
                 raise
             except Exception:
                 logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
-                                 extra={"msg": msg})
+                                 extra={"queue_msg": msg})
 
     return send_to_preprocessors
 
