@@ -14,7 +14,6 @@ from importlib import import_module
 from tempfile import NamedTemporaryFile
 from time import time
 
-import contextvars
 import tornado.ioloop
 import tornado.web
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
@@ -28,16 +27,20 @@ from logstash_formatter import LogstashFormatterV1
 from prometheus_async.aio import time as prom_time
 from boto3.session import Session
 
-account = contextvars.ContextVar("account", default="unknown")
-request_id = contextvars.ContextVar("request_id", default="unknown")
+
+def get_extra(account="unknown", request_id="unknown"):
+    return {
+        "account": account,
+        "request_id": request_id,
+    }
+
+
 container = str(uuid.uuid4())
 
 
 class ContextFilter(logging.Filter):
 
     def filter(self, record):
-        record.account = getattr(record, "account", account.get())
-        record.request_id = getattr(record, "request_id", request_id.get())
         record.container = container
         return True
 
@@ -163,42 +166,43 @@ def make_preprocessor(queue=None):
     queue = produce_queue if queue is None else queue
 
     async def send_to_preprocessors(client):
+        extra = get_extra()
         if not queue:
             await asyncio.sleep(0.1)
         else:
             try:
                 item = queue.popleft()
             except Exception:
-                logger.exception("Failed to popleft")
+                logger.exception("Failed to popleft", extra=extra)
                 return
 
             try:
                 topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
-                account.set(msg["account"])
-                request_id.set(payload_id)
+                extra["account"] = msg["account"]
+                extra["request_id"] = payload_id
                 mnm.uploads_popped_to_topic.labels(topic=topic).inc()
             except Exception:
-                logger.exception("Bad data from produce_queue.", extra={"item": item})
+                logger.exception("Bad data from produce_queue.", extra={"item": item, **extra})
                 return
 
             logger.info(
                 "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
-                len(queue), topic, payload_id, msg)
+                len(queue), topic, payload_id, msg, extra=extra)
             try:
                 with mnm.uploads_json_dumps.labels(key="send_to_preprocessors").time():
                     data = json.dumps(msg)
                 with mnm.uploads_send_and_wait_seconds.time():
                     await client.send_and_wait(topic, data.encode("utf-8"))
-                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id)
+                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra=extra)
             except KafkaError:
                 queue.append(item)
                 logger.error(
                     "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
-                    topic, payload_id, len(queue))
+                    topic, payload_id, len(queue), extra=extra)
                 raise
             except Exception:
                 logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
-                                 extra={"queue_msg": msg})
+                                 extra={"queue_msg": msg, **extra})
 
     return send_to_preprocessors
 
@@ -213,26 +217,27 @@ async def handle_file(msg):
     Arguments:
         msgs -- list of kafka messages consumed on validation topic
     """
+    extra = get_extra()
+
     try:
         with mnm.uploads_json_loads.labels(key="handle_file").time():
             data = json.loads(msg.value)
-        logger.info("handling_data: %s", data)
+        logger.debug("handling_data: %s", data, extra=extra)
     except Exception:
-        logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value))
+        logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value), extra=extra)
         return
 
     if 'payload_id' not in data and 'hash' not in data:
-        logger.error("payload_id or hash not in message. Payload not removed from permanent.")
+        logger.error("payload_id or hash not in message. Payload not removed from permanent.", extra=extra)
         return
 
     # get the payload_id. Getting the hash is temporary until consumers update
     payload_id = data['payload_id'] if 'payload_id' in data else data.get('hash')
-    request_id.set(payload_id)
-
+    extra["request_id"] = payload_id
+    extra["account"] = account = data.get('account', 'unknown')
     result = data.get('validation', 'unknown')
-    account.set(data.get('account', 'unknown'))
 
-    logger.info('processing message: payload [%s] - %s', payload_id, result)
+    logger.info('processing message: payload [%s] - %s', payload_id, result, extra=extra)
 
     r = await defer(storage.ls, storage.PERM, payload_id)
 
@@ -248,11 +253,11 @@ async def handle_file(msg):
                     'url': url,
                     'service': data.get('service'),
                     'payload_id': payload_id,
-                    'account': account.get(),
+                    'account': account,
                     'principal': data.get('principal'),
                     'b64_identity': data.get('b64_identity'),
                     'satellite_managed': data.get('satellite_managed'),
-                    'rh_account': account.get(),  # deprecated key, temp for backward compatibility
+                    'rh_account': account,  # deprecated key, temp for backward compatibility
                     'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
                 }
             }
@@ -260,28 +265,32 @@ async def handle_file(msg):
             produce_queue.append(data)
             logger.info(
                 "data for topic [%s], payload_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
-                data['topic'], payload_id, data["msg"].get("id"), len(produce_queue))
-            logger.debug("payload_id [%s] data: %s", payload_id, data)
+                data['topic'], payload_id, data["msg"].get("id"), len(produce_queue), extra=extra)
+            logger.debug("payload_id [%s] data: %s", payload_id, data, extra=extra)
         elif result.lower() == 'failure':
             mnm.uploads_invalidated.inc()
-            logger.info('payload_id [%s] rejected', payload_id)
-            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, account.get())
+            logger.info('payload_id [%s] rejected', payload_id, extra=extra)
+            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, account)
         elif result.lower() == 'handoff':
             mnm.uploads_handed_off.inc()
-            logger.info('payload_id [%s] handed off', payload_id)
+            logger.info('payload_id [%s] handed off', payload_id, extra=extra)
         else:
-            logger.info('Unrecognized result: %s', result.lower())
+            logger.info('Unrecognized result: %s', result.lower(), extra=extra)
     else:
-        logger.info('payload_id [%s] no longer in permanent bucket', payload_id)
+        logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra=extra)
 
 
-async def post_to_inventory(identity, values):
+async def post_to_inventory(identity, values, extra):
+    request_id = extra["request_id"]
+    account = extra["account"]
+
     headers = {'x-rh-identity': identity,
                'Content-Type': 'application/json',
-               'x-rh-insights-request-id': request_id.get(),
+               'x-rh-insights-request-id': request_id,
                }
     post = prepare_facts_for_inventory(values['metadata'])
-    post['account'] = account.get()
+    post['account'] = account
+
     with mnm.uploads_json_dumps.labels(key="post_to_inventory").time():
         post = json.dumps([post])
     try:
@@ -293,22 +302,22 @@ async def post_to_inventory(identity, values):
         if response.code != 207:
             mnm.uploads_inventory_post_failure.inc()
             error = body.get('detail')
-            logger.error('Failed to post to inventory: %s', error)
-            logger.debug('Host data that failed to post: %s' % post)
+            logger.error('Failed to post to inventory: %s', error, extra=extra)
+            logger.debug('Host data that failed to post: %s' % post, extra=extra)
             return None
         elif body['data'][0]['status'] != 200 and body['data'][0]['status'] != 201:
             mnm.uploads_inventory_post_failure.inc()
             error = body['data'][0].get('detail')
-            logger.error('Failed to post to inventory: ' + error)
-            logger.debug('Host data that failed to post: %s' % post)
+            logger.error('Failed to post to inventory: ' + error, extra=extra)
+            logger.debug('Host data that failed to post: %s' % post, extra=extra)
             return None
         else:
             mnm.uploads_inventory_post_success.inc()
             inv_id = body['data'][0]['host']['id']
-            logger.info('Payload [%s] posted to inventory. ID [%s]', request_id.get(), inv_id, extra={"id": inv_id})
+            logger.info('Payload [%s] posted to inventory. ID [%s]', request_id.get(), inv_id, extra={"id": inv_id, **extra})
             return inv_id
     except HTTPClientError:
-        logger.exception("Unable to contact inventory")
+        logger.exception("Unable to contact inventory", extra=extra)
 
 
 class NoAccessLog(tornado.web.RequestHandler):
@@ -368,20 +377,21 @@ class UploadHandler(tornado.web.RequestHandler):
         Returns:
             tuple -- status code and a user friendly message
         """
+        extra = get_extra(account=self.account, request_id=self.payload_id)
         content_length = int(self.request.headers["Content-Length"])
         if content_length >= config.MAX_LENGTH:
             mnm.uploads_too_large.inc()
-            logger.error("Payload too large. Request ID [%s] - Length %s", self.payload_id, str(config.MAX_LENGTH))
-            return self.error(413, f"Payload too large: {content_length}. Should not exceed {config.MAX_LENGTH} bytes")
+            logger.error("Payload too large. Request ID [%s] - Length %s", self.payload_id, str(config.MAX_LENGTH), extra=extra)
+            return self.error(413, f"Payload too large: {content_length}. Should not exceed {config.MAX_LENGTH} bytes", **extra)
         try:
             serv_dict = get_service(self.payload_data['content_type'])
         except Exception:
             mnm.uploads_unsupported_filetype.inc()
-            logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
-            return self.error(415, 'Unsupported Media Type')
+            logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
+            return self.error(415, 'Unsupported Media Type', **extra)
         if not config.DEVMODE and serv_dict["service"] not in VALID_TOPICS:
-            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id)
-            return self.error(415, 'Unsupported MIME type')
+            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
+            return self.error(415, 'Unsupported MIME type', **extra)
 
     def get(self):
         """Handles GET requests to the upload endpoint
@@ -414,23 +424,24 @@ class UploadHandler(tornado.web.RequestHandler):
             None if upload failed
         """
         user_agent = self.request.headers.get("User-Agent")
+        extra = get_extra(account=self.account, request_id=payload_id)
 
         upload_start = time()
-        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id)
+        logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra=extra)
         try:
-            url = await defer(storage.write, filename, storage.PERM, payload_id, account.get(), user_agent)
+            url = await defer(storage.write, filename, storage.PERM, payload_id, self.account, user_agent)
             elapsed = time() - upload_start
 
             logger.info(
                 "tracking id [%s] payload_id [%s] uploaded! elapsed [%fsec] url [%s]",
-                tracking_id, payload_id, elapsed, url)
+                tracking_id, payload_id, elapsed, url, extra=extra)
 
             return url
         except Exception:
             elapsed = time() - upload_start
             logger.exception(
                 "Exception hit uploading: tracking id [%s] payload_id [%s] elapsed [%fsec]",
-                tracking_id, payload_id, elapsed)
+                tracking_id, payload_id, elapsed, extra=extra)
         finally:
             await defer(os.remove, filename)
 
@@ -448,13 +459,12 @@ class UploadHandler(tornado.web.RequestHandler):
 
         Write to storage, send message to MQ
         """
-        account.set(self.account)
-        request_id.set(self.payload_id)
+        extra = get_extra(account=self.account, request_id=self.payload_id)
         values = {}
         # use dummy values for now if no account given
         if self.identity:
-            values['account'] = account.get()
-            values['rh_account'] = account.get()
+            values['account'] = self.account
+            values['rh_account'] = self.account
             values['principal'] = self.identity['internal'].get('org_id') if self.identity.get('internal') else None
         else:
             values['account'] = config.DUMMY_VALUES['account']
@@ -468,7 +478,7 @@ class UploadHandler(tornado.web.RequestHandler):
         if self.metadata:
             with mnm.uploads_json_loads.labels(key="process_upload").time():
                 values['metadata'] = json.loads(self.metadata)
-            values['id'] = await post_to_inventory(self.b64_identity, values)
+            values['id'] = await post_to_inventory(self.b64_identity, values, extra)
             del values['metadata']
 
         url = await self.upload(self.filename, self.tracking_id, self.payload_id, self.identity)
@@ -480,7 +490,7 @@ class UploadHandler(tornado.web.RequestHandler):
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
-                self.payload_id, topic, len(produce_queue)
+                self.payload_id, topic, len(produce_queue), extra=extra
             )
 
     @mnm.uploads_write_tarfile.time()
@@ -526,28 +536,32 @@ class UploadHandler(tornado.web.RequestHandler):
                 description: Upload field not found
         """
         mnm.uploads_total.inc()
-        request_id.set(self.request.headers.get('x-rh-insights-request-id', uuid.uuid4().hex))
-        self.payload_id = request_id.get()
+        self.payload_id = self.request.headers.get('x-rh-insights-request-id', uuid.uuid4().hex)
+        self.account = "unknown"
+
+        # is this really ok to be optional?
         self.b64_identity = self.request.headers.get('x-rh-identity')
         if self.b64_identity:
             with mnm.uploads_json_loads.labels(key="post").time():
                 header = json.loads(base64.b64decode(self.b64_identity))
             self.identity = header['identity']
             self.account = self.identity["account_number"]
-            account.set(self.account)
+
+        extra = get_extra(account=self.account, request_id=self.payload_id)
 
         if not self.request.files.get('upload') and not self.request.files.get('file'):
             return self.error(
                 415,
                 "Upload field not found",
                 files=list(self.request.files),
+                **extra
             )
 
         # TODO: pull this out once no one is using the upload field anymore
         self.payload_data = self.request.files.get('upload')[0] if self.request.files.get('upload') else self.request.files.get('file')[0]
 
         if self.payload_id is None:
-            return self.error(400, "No payload_id assigned.  Upload failed.")
+            return self.error(400, "No payload_id assigned.  Upload failed.", **extra)
 
         if self.upload_validation():
             mnm.uploads_invalid.inc()
