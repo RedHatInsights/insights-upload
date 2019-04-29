@@ -29,8 +29,6 @@ DEVMODE = os.getenv('DEV', False)
 
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 
-INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
-
 STORAGE_DRIVER = os.getenv("STORAGE_DRIVER", "s3")
 
 PATH_PREFIX = os.getenv('PATH_PREFIX', '/api/')
