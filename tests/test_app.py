@@ -6,7 +6,6 @@ import sh
 
 import pytest
 import requests
-import responses
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 from unittest import TestCase

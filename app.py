@@ -16,7 +16,6 @@ from time import time
 
 import tornado.ioloop
 import tornado.web
-from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
 
