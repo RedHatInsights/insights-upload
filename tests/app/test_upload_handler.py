@@ -1,4 +1,4 @@
-from app import app, UploadHandler
+from app import get_app, UploadHandler
 from importlib import import_module
 from mock.mock import Mock, patch
 from tempfile import NamedTemporaryFile
@@ -22,11 +22,9 @@ class Anything(object):
 
 
 class TestUpload(AsyncHTTPTestCase):
+
     def get_app(self):
-        """
-        Get the tornado.web.Application instance.
-        """
-        return app
+        return get_app()
 
     @patch("app.UploadHandler.process_upload", wraps=process_upload)  # Must be an async method.
     @patch("app.os.remove")
@@ -49,7 +47,7 @@ class TestUpload(AsyncHTTPTestCase):
                                       "x-rh-insights-request-id": "test",
                                       "x-rh-identity": "eyJpZGVudGl0eSI6eyJhY2NvdW50X251bWJlciI6IjAwMDAwMDEifX0="},
                           "body_arguments": {"metadata": [b'{"machine_id": "12345"}']}})
-        handler = UploadHandler(app, request)
+        handler = UploadHandler(get_app(), request)
 
         yield handler.post()
 
@@ -59,10 +57,7 @@ class TestUpload(AsyncHTTPTestCase):
 class TestPost(AsyncHTTPTestCase):
 
     def get_app(self):
-        """
-        Get the tornado.web.Application instance.
-        """
-        return app
+        return get_app()
 
     @patch("app.UploadHandler.process_upload", wraps=process_upload)  # Must be an async method.
     @patch("app.UploadHandler.write_data", return_value="some_file.tgz")
@@ -76,7 +71,7 @@ class TestPost(AsyncHTTPTestCase):
                                       "x-rh-insights-request-id": "test",
                                       "x-rh-identity": "eyJpZGVudGl0eSI6eyJhY2NvdW50X251bWJlciI6IjAwMDAwMDEifX0="},
                           "body_arguments": {"metadata": [b'{"machine_id": "12345"}']}})
-        handler = UploadHandler(app, request)
+        handler = UploadHandler(get_app(), request)
 
         yield handler.post()
 

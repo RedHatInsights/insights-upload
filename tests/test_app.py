@@ -81,7 +81,7 @@ class TestUploadHandler(AsyncHTTPTestCase):
         return request.prepare()
 
     def get_app(self):
-        return app.app
+        return app.get_app()
 
     @gen_test
     def test_root_get(self):

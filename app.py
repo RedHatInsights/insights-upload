@@ -577,25 +577,27 @@ class SpecHandler(tornado.web.RequestHandler):
         self.write(response)
 
 
-endpoints = [
-    (config.API_PREFIX, RootHandler),
-    (config.API_PREFIX + "/v1/version", VersionHandler),
-    (config.API_PREFIX + "/v1/upload", UploadHandler),
-    (config.API_PREFIX + "/v1/openapi.json", SpecHandler),
-    (r"/r/insights/platform/upload", RootHandler),
-    (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
-    (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
-    (r"/r/insights/platform/upload/api/v1/openapi.json", SpecHandler),
-    (r"/metrics", MetricsHandler)
-]
+def get_app():
+    endpoints = [
+        (config.API_PREFIX, RootHandler),
+        (config.API_PREFIX + "/v1/version", VersionHandler),
+        (config.API_PREFIX + "/v1/upload", UploadHandler),
+        (config.API_PREFIX + "/v1/openapi.json", SpecHandler),
+        (r"/r/insights/platform/upload", RootHandler),
+        (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
+        (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
+        (r"/r/insights/platform/upload/api/v1/openapi.json", SpecHandler),
+        (r"/metrics", MetricsHandler)
+    ]
 
-for urlSpec in endpoints:
-    config.spec.path(urlspec=urlSpec)
+    for urlSpec in endpoints:
+        config.spec.path(urlspec=urlSpec)
 
-app = tornado.web.Application(endpoints, max_body_size=config.MAX_LENGTH)
+    return tornado.web.Application(endpoints, max_body_size=config.MAX_LENGTH)
 
 
 def main():
+    app = get_app()
     app.listen(config.LISTEN_PORT)
     logger.info(f"Web server listening on port {config.LISTEN_PORT}")
     loop = IOLoop.current()
