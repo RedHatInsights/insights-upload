@@ -123,6 +123,20 @@ else:
     BUILD_DATE = config.get_commit_date(config.BUILD_ID)
 
 
+def clean_up_metadata(facts):
+    """
+    Empty values need to be stripped from metadata prior to posting to inventory.
+    Display_name must be greater than 1 and less than 200 characters.
+    """
+    defined_facts = {}
+    for fact in facts:
+        if facts[fact]:
+            defined_facts.update({fact: facts[fact]})
+    if 'display_name' in defined_facts and len(defined_facts['display_name']) not in range(2, 200):
+        defined_facts.pop('display_name')
+    return defined_facts
+
+
 def get_service(content_type):
     """
     Returns the service that content_type maps to.
@@ -422,7 +436,7 @@ class UploadHandler(tornado.web.RequestHandler):
         values['b64_identity'] = self.b64_identity
         if self.metadata:
             with mnm.uploads_json_loads.labels(key="process_upload").time():
-                values['metadata'] = json.loads(self.metadata)
+                values['metadata'] = clean_up_metadata(json.loads(self.metadata))
 
         url = await self.upload(self.filename, self.tracking_id, self.payload_id, self.identity)
 
