@@ -5,10 +5,11 @@ import os
 import re
 import base64
 import uuid
+import signal
 
 from importlib import import_module
 from tempfile import NamedTemporaryFile
-from time import time
+from time import time, sleep
 
 import tornado.ioloop
 import tornado.web
@@ -33,6 +34,9 @@ storage = import_module("utils.storage.{}".format(config.STORAGE_DRIVER))
 # Upload content type must match this regex. Third field matches end service
 content_regex = r'^application/vnd\.redhat\.(?P<service>[a-z0-9-]+)\.(?P<category>[a-z0-9-]+).*'
 produce_queue = messaging.produce_queue
+
+LOOPS = {}
+current_archives = []
 
 
 if config.DEVMODE:
@@ -234,6 +238,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['url'] = url
             topic = 'platform.upload.' + self.service
             mnm.uploads_produced_to_topic.labels(topic=topic).inc()
+            current_archives.append(self.payload_id)
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
@@ -435,16 +440,34 @@ def get_app():
     return tornado.web.Application(endpoints, max_body_size=config.MAX_LENGTH)
 
 
+def signal_handler(signal, frame):
+    loop = IOLoop.current()
+    logger.info("Recieved Exit Signal: %s", signal)
+    loop.spawn_callback(shutdown)
+
+
+async def shutdown():
+    loop = IOLoop.current()
+    logger.debug("Stopping Server")
+    messaging.stop()
+    while len(current_archives) > 0:
+        logger.DEBUG("Remaing archives: %s", len(current_archives))
+        sleep(1)
+    loop.stop()
+    logger.info("Ingress Shutdown")
+    logging.shutdown()
+
+
 def main():
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     app = get_app()
     app.listen(config.LISTEN_PORT)
     logger.info(f"Web server listening on port {config.LISTEN_PORT}")
     loop = IOLoop.current()
-    messaging.start(loop)
-    try:
-        loop.start()
-    except KeyboardInterrupt:
-        loop.stop()
+    messaging.start(loop, current_archives)
+    loop.start()
 
 
 if __name__ == "__main__":

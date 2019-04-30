@@ -103,8 +103,9 @@ async def handle_validation(client):
             await asyncio.gather(*[handle_file(msg) for msg in msgs])
 
 
-def make_preprocessor(queue=None):
+def make_preprocessor(queue=None, current_archives=None):
     queue = produce_queue if queue is None else queue
+    current_archives = current_archives if current_archives else []
 
     async def send_to_preprocessors(client):
         extra = get_extra()
@@ -134,6 +135,8 @@ def make_preprocessor(queue=None):
                     data = json.dumps(msg)
                 with mnm.uploads_send_and_wait_seconds.time():
                     await client.send_and_wait(topic, data.encode("utf-8"))
+                    if payload_id in current_archives:
+                        current_archives.remove(payload_id)
                 logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra=extra)
             except KafkaError:
                 queue.append(item)
@@ -148,12 +151,20 @@ def make_preprocessor(queue=None):
     return send_to_preprocessors
 
 
-def start(loop):
+_to_stop = []
+
+
+def start(loop, current_archives):
     kafka_consumer = AIOKafkaConsumer(config.VALIDATION_QUEUE, loop=loop.asyncio_loop,
                                       bootstrap_servers=config.MQ, group_id=config.MQ_GROUP_ID)
     kafka_producer = AIOKafkaProducer(loop=loop.asyncio_loop, bootstrap_servers=config.MQ,
                                       request_timeout_ms=10000, connections_max_idle_ms=None)
     CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
     PRODUCER = ReconnectingClient(kafka_producer, "producer")
-    loop.spawn_callback(CONSUMER.get_callback(handle_validation))
-    loop.spawn_callback(PRODUCER.get_callback(make_preprocessor(produce_queue)))
+    loop.spawn_callback(PRODUCER.get_callback(make_preprocessor(produce_queue, current_archives)))
+    _to_stop.append(loop.spawn_callback(CONSUMER.get_callback(handle_validation)))
+
+
+def stop():
+    for c in _to_stop:
+        c.stop()
