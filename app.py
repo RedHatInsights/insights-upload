@@ -42,12 +42,6 @@ storage = import_module("utils.storage.{}".format(config.STORAGE_DRIVER))
 # Upload content type must match this regex. Third field matches end service
 content_regex = r'^application/vnd\.redhat\.(?P<service>[a-z0-9-]+)\.(?P<category>[a-z0-9-]+).*'
 
-kafka_consumer = AIOKafkaConsumer(config.VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop,
-                                  bootstrap_servers=config.MQ, group_id=config.MQ_GROUP_ID)
-kafka_producer = AIOKafkaProducer(loop=IOLoop.current().asyncio_loop, bootstrap_servers=config.MQ,
-                                  request_timeout_ms=10000, connections_max_idle_ms=None)
-CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
-PRODUCER = ReconnectingClient(kafka_producer, "producer")
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque()
@@ -602,6 +596,12 @@ def main():
     logger.info(f"Web server listening on port {config.LISTEN_PORT}")
     loop = IOLoop.current()
     loop.set_default_executor(thread_pool_executor)
+    kafka_consumer = AIOKafkaConsumer(config.VALIDATION_QUEUE, loop=IOLoop.current().asyncio_loop,
+                                      bootstrap_servers=config.MQ, group_id=config.MQ_GROUP_ID)
+    kafka_producer = AIOKafkaProducer(loop=IOLoop.current().asyncio_loop, bootstrap_servers=config.MQ,
+                                      request_timeout_ms=10000, connections_max_idle_ms=None)
+    CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
+    PRODUCER = ReconnectingClient(kafka_producer, "producer")
     loop.spawn_callback(CONSUMER.get_callback(handle_validation))
     loop.spawn_callback(PRODUCER.get_callback(make_preprocessor(produce_queue)))
     try:
