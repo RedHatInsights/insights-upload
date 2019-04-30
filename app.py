@@ -8,11 +8,12 @@ import base64
 import sys
 import uuid
 import watchtower
+import signal
 
 from concurrent.futures import ThreadPoolExecutor
 from importlib import import_module
 from tempfile import NamedTemporaryFile
-from time import time
+from time import time, sleep
 
 import tornado.ioloop
 import tornado.web
@@ -107,6 +108,9 @@ mnm.uploads_produce_queue_size.set_function(lambda: len(produce_queue))
 thread_pool_executor = ThreadPoolExecutor(max_workers=config.MAX_WORKERS)
 mnm.uploads_executor_qsize.set_function(lambda: thread_pool_executor._work_queue.qsize())
 
+LOOPS = {}
+current_archives = []
+
 
 async def defer(*args):
     try:
@@ -193,6 +197,8 @@ def make_preprocessor(queue=None):
                     data = json.dumps(msg)
                 with mnm.uploads_send_and_wait_seconds.time():
                     await client.send_and_wait(topic, data.encode("utf-8"))
+                    if payload_id in current_archives:
+                        current_archives.remove(payload_id)
                 logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra=extra)
             except KafkaError:
                 queue.append(item)
@@ -487,6 +493,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['url'] = url
             topic = 'platform.upload.' + self.service
             mnm.uploads_produced_to_topic.labels(topic=topic).inc()
+            current_archives.append(self.payload_id)
             produce_queue.append({'topic': topic, 'msg': values})
             logger.info(
                 "Data for payload_id [%s] to topic [%s] put on produce queue (qsize now: %d)",
@@ -687,17 +694,41 @@ for urlSpec in endpoints:
 app = tornado.web.Application(endpoints, max_body_size=config.MAX_LENGTH)
 
 
+def signal_handler(signal, frame):
+    loop = IOLoop.current()
+    logger.info("Recieved Exit Signal: %s", signal)
+    loop.spawn_callback(shutdown)
+
+
+async def shutdown():
+    loop = IOLoop.current()
+    logger.debug("Stopping Server")
+    LOOPS["consumer"].stop()
+    logger.debug("Consumer Stopped")
+    while len(current_archives) > 0:
+        logger.DEBUG("Remaing archives: %s", len(current_archives))
+        sleep(1)
+    loop.stop()
+    logger.info("Ingress Shutdown")
+    logging.shutdown()
+
+
 def main():
+
+    signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGINT, signal_handler)
+
     app.listen(config.LISTEN_PORT)
     logger.info(f"Web server listening on port {config.LISTEN_PORT}")
     loop = IOLoop.current()
     loop.set_default_executor(thread_pool_executor)
-    loop.spawn_callback(CONSUMER.get_callback(handle_validation))
-    loop.spawn_callback(PRODUCER.get_callback(make_preprocessor(produce_queue)))
-    try:
-        loop.start()
-    except KeyboardInterrupt:
-        loop.stop()
+    LOOPS["consumer"] = IOLoop(make_current=False).instance()
+    LOOPS["producer"] = IOLoop(make_current=False).instance()
+    LOOPS["consumer"].add_callback(CONSUMER.get_callback(handle_validation))
+    LOOPS["producer"].add_callback(PRODUCER.get_callback(make_preprocessor(produce_queue)))
+    for k, v in LOOPS.items():
+        v.start()
+    loop.start()
 
 
 if __name__ == "__main__":
