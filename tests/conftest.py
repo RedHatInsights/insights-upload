@@ -14,6 +14,7 @@ from moto import mock_s3
 
 from utils import mnm, config
 from utils.storage import localdisk as local_storage, s3 as s3_storage
+import messaging
 from tests.fixtures import StopLoopException
 
 
@@ -164,10 +165,10 @@ class MyDeque(collections.deque):
 
 @pytest.fixture
 def produce_queue_mocked():
-    orig_queue = app.produce_queue
-    app.produce_queue = MyDeque([], 999)
-    yield app.produce_queue
-    app.produce_queue = orig_queue
+    orig_queue = messaging.produce_queue
+    messaging.produce_queue = MyDeque([], 999)
+    yield messaging.produce_queue
+    messaging.produce_queue = orig_queue
 
 
 @pytest.fixture
