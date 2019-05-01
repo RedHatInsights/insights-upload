@@ -314,7 +314,7 @@ async def post_to_inventory(identity, values, extra):
         else:
             mnm.uploads_inventory_post_success.inc()
             inv_id = body['data'][0]['host']['id']
-            logger.info('Payload [%s] posted to inventory. ID [%s]', request_id.get(), inv_id, extra={"id": inv_id, **extra})
+            logger.info('Payload [%s] posted to inventory. ID [%s]', request_id, inv_id, extra={"id": inv_id, **extra})
             return inv_id
     except HTTPClientError:
         logger.exception("Unable to contact inventory", extra=extra)
