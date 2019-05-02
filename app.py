@@ -517,7 +517,11 @@ class UploadHandler(tornado.web.RequestHandler):
                 **extra
             )
 
-        # TODO: pull this out once no one is using the upload field anymore
+        try:
+            upload_field = list(self.request.files)[0]
+            mnm.uploads_file_field.labels(field=upload_field).inc()
+        except IndexError:
+            pass
         self.payload_data = self.request.files.get('upload')[0] if self.request.files.get('upload') else self.request.files.get('file')[0]
 
         if self.payload_id is None:
