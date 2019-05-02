@@ -80,7 +80,7 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
                                                  log_group="platform",
                                                  stream_name=NAMESPACE)
     cw_handler.setFormatter(LogstashFormatterV1())
-    logging.root.addhandler(cw_handler)
+    logging.root.addHandler(cw_handler)
 
 if not config.DEVMODE:
     VALID_TOPICS = config.get_valid_topics()
