@@ -42,7 +42,7 @@ MQ_GROUP_ID = os.getenv('MQ_GROUP_ID', 'upload')
 BUILD_ID = os.getenv('OPENSHIFT_BUILD_COMMIT', '8d06f664a88253c361e61af5a4fa2ac527bb5f46')
 
 TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/tmp/topics.json')
-MAX_RECORDS = os.getenv("MAX_RECORDS", 1)
+MAX_RECORDS = int(os.getenv("MAX_RECORDS", 1))
 
 # Items in this map are _special cases_ where the service cannot be extracted
 # from the Content-Type
