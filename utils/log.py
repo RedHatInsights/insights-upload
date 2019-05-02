@@ -53,5 +53,4 @@ def setup_logging():
                                                      log_group="platform",
                                                      stream_name=NAMESPACE)
         cw_handler.setFormatter(LogstashFormatterV1())
-        for l in (logger, *other_loggers):
-            l.addHandler(cw_handler)
+        logging.root.addHandler(cw_handler)
