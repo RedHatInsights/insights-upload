@@ -23,6 +23,7 @@ uploads_unsupported_filetype = Counter('uploads_unsupported_filetype', 'The tota
 uploads_handed_off = Counter('uploads_handed_off', 'The total number of uploads handed off')
 uploads_produced_to_topic = Counter('uploads_produced_to_queue', 'Total number of messages pushed to the produce_queue for given topic.', ['topic'])
 uploads_popped_to_topic = Counter('uploads_popped_to_queue', 'Total number of messages popped from the produce_queue for given topic.', ['topic'])
+uploads_file_field = Counter('uploads_file_field', 'Total number of payloads recieved using which form field', ['field'])
 
 # Prometheus Summaries
 uploads_write_tarfile = Summary('uploads_write_tarfile_seconds', 'Total seconds it takes to write the tarfile upon upload')
