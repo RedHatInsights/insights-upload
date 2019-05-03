@@ -1,3 +1,4 @@
+import io
 import boto3
 import os
 import logging
@@ -24,9 +25,11 @@ s3 = boto3.client('s3',
 
 @mnm.uploads_s3_write_seconds.time()
 def write(data, dest, uuid, account, user_agent):
-    s3.upload_file(data, dest, uuid, ExtraArgs={"Metadata": {"account": account,
-                                                             "user-agent": user_agent}
-                                                })
+    data = io.BytesIO(data)
+    s3.upload_fileobj(data, dest, uuid, ExtraArgs={
+        "Metadata": {"account": account,
+                     "user-agent": user_agent}
+    })
     url = s3.generate_presigned_url('get_object',
                                     Params={'Bucket': dest,
                                             'Key': uuid}, ExpiresIn=86400)

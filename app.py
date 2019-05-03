@@ -171,38 +171,49 @@ def make_preprocessor(queue=None):
             await asyncio.sleep(0.1)
         else:
             try:
-                item = queue.popleft()
+                items = list(queue)
+                queue.clear()
             except Exception:
                 logger.exception("Failed to popleft", extra=extra)
                 return
 
-            try:
-                topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
-                extra["account"] = msg["account"]
-                extra["request_id"] = payload_id
-                mnm.uploads_popped_to_topic.labels(topic=topic).inc()
-            except Exception:
-                logger.exception("Bad data from produce_queue.", extra={"item": item, **extra})
-                return
+            async def _work(item):
+                try:
+                    topic, msg, payload_id = item['topic'], item['msg'], item['msg'].get('payload_id')
+                    extra["account"] = msg["account"]
+                    extra["request_id"] = payload_id
+                    mnm.uploads_popped_to_topic.labels(topic=topic).inc()
+                except Exception:
+                    logger.exception("Bad data from produce_queue.", extra={"item": item, **extra})
+                    return
 
-            logger.info(
-                "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
-                len(queue), topic, payload_id, msg, extra=extra)
-            try:
-                with mnm.uploads_json_dumps.labels(key="send_to_preprocessors").time():
-                    data = json.dumps(msg)
-                with mnm.uploads_send_and_wait_seconds.time():
-                    await client.send_and_wait(topic, data.encode("utf-8"))
-                logger.info("send data for topic [%s] with payload_id [%s] succeeded", topic, payload_id, extra=extra)
-            except KafkaError:
-                queue.append(item)
-                logger.error(
-                    "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
-                    topic, payload_id, len(queue), extra=extra)
-                raise
-            except Exception:
-                logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
-                                 extra={"queue_msg": msg, **extra})
+                logger.info(
+                    "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
+                    len(queue), topic, payload_id, msg, extra=extra)
+
+                @prom_time(mnm.uploads_send_and_wait_seconds)
+                async def send():
+                    try:
+                        await client.send_and_wait(topic, data.encode("utf-8"))
+                    except KafkaError:
+                        queue.append(item)
+                        logger.error(
+                            "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
+                            topic, payload_id, len(queue), extra=extra)
+                        raise
+                    except Exception:
+                        logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
+                                         extra={"queue_msg": msg, **extra})
+
+                try:
+                    with mnm.uploads_json_dumps.labels(key="send_to_preprocessors").time():
+                        data = json.dumps(msg)
+                except Exception:
+                    logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
+                                     extra={"queue_msg": msg, **extra})
+                    return
+
+            await asyncio.gather(*[asyncio.ensure_future(_work(item)) for item in items])
 
     return send_to_preprocessors
 
@@ -408,7 +419,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         self.write("Accepted Content-Types: gzipped tarfile, zip file")
 
-    async def upload(self, filename, tracking_id, payload_id, identity):
+    async def upload(self, data, tracking_id, payload_id, identity):
         """Write the payload to the configured storage
 
         Storage write and os file operations are not async so we offload to executor.
@@ -429,7 +440,7 @@ class UploadHandler(tornado.web.RequestHandler):
         upload_start = time()
         logger.info("tracking id [%s] payload_id [%s] attempting upload", tracking_id, payload_id, extra=extra)
         try:
-            url = await defer(storage.write, filename, storage.PERM, payload_id, self.account, user_agent)
+            url = await defer(storage.write, data, storage.PERM, payload_id, self.account, user_agent)
             elapsed = time() - upload_start
 
             logger.info(
@@ -442,8 +453,6 @@ class UploadHandler(tornado.web.RequestHandler):
             logger.exception(
                 "Exception hit uploading: tracking id [%s] payload_id [%s] elapsed [%fsec]",
                 tracking_id, payload_id, elapsed, extra=extra)
-        finally:
-            await defer(os.remove, filename)
 
     async def process_upload(self):
         """Process the uploaded file we have received.
@@ -481,7 +490,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['id'] = await post_to_inventory(self.b64_identity, values, extra)
             del values['metadata']
 
-        url = await self.upload(self.filename, self.tracking_id, self.payload_id, self.identity)
+        url = await self.upload(self.filedata, self.tracking_id, self.payload_id, self.identity)
 
         if url:
             values['url'] = url
@@ -575,7 +584,7 @@ class UploadHandler(tornado.web.RequestHandler):
             self.size = int(self.request.headers['Content-Length'])
             body = self.payload_data['body']
 
-            self.filename = await defer(self.write_data, body)
+            self.filedata = body
 
             self.set_status(202, "Accepted")
 
