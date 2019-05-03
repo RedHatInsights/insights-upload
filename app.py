@@ -662,7 +662,7 @@ async def shutdown():
     LOOPS["consumer"].stop()
     logger.debug("Consumer Stopped")
     while len(current_archives) > 0:
-        logger.DEBUG("Remaing archives: %s", len(current_archives))
+        logger.debug("Remaing archives: %s", len(current_archives))
         sleep(1)
     loop.stop()
     logger.info("Ingress Shutdown")
