@@ -241,6 +241,7 @@ class TestProducerAndConsumer:
 
         assert str(e.value) == exc_message
 
+    @asyncio.coroutine
     def test_producer_with_s3_bucket(self, local_file, s3_mocked, broker_stage_messages, event_loop):
         total_messages = 4
         [self._create_message_s3(local_file, broker_stage_messages) for _ in range(total_messages)]
@@ -363,6 +364,7 @@ class TestProducerAndConsumer:
             assert mq.trying_to_connect_failures_calls == 0
             assert len(app.produce_queue) == 0
 
+    @asyncio.coroutine
     @patch("utils.config.RETRY_INTERVAL", 0.01)
     def test_producer_with_connection_issues(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
