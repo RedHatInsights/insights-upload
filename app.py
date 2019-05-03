@@ -167,6 +167,20 @@ async def handle_validation(client):
 def make_preprocessor(queue=None):
     queue = produce_queue if queue is None else queue
 
+    @prom_time(mnm.uploads_send_and_wait_seconds)
+    async def send(client, topic, data, extra, payload_id, item, msg):
+        try:
+            await client.send_and_wait(topic, data.encode("utf-8"))
+        except KafkaError:
+            queue.append(item)
+            logger.error(
+                "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
+                topic, payload_id, len(queue), extra=extra)
+            raise
+        except Exception:
+            logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
+                             extra={"queue_msg": msg, **extra})
+
     async def send_to_preprocessors(client):
         extra = get_extra()
         if not queue:
@@ -193,20 +207,6 @@ def make_preprocessor(queue=None):
                     "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
                     len(queue), topic, payload_id, msg, extra=extra)
 
-                @prom_time(mnm.uploads_send_and_wait_seconds)
-                async def send():
-                    try:
-                        await client.send_and_wait(topic, data.encode("utf-8"))
-                    except KafkaError:
-                        queue.append(item)
-                        logger.error(
-                            "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
-                            topic, payload_id, len(queue), extra=extra)
-                        raise
-                    except Exception:
-                        logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
-                                         extra={"queue_msg": msg, **extra})
-
                 try:
                     with mnm.uploads_json_dumps.labels(key="send_to_preprocessors").time():
                         data = json.dumps(msg)
@@ -214,6 +214,8 @@ def make_preprocessor(queue=None):
                     logger.exception("Failure to send_and_wait. Did *not* put item back on queue.",
                                      extra={"queue_msg": msg, **extra})
                     return
+
+                await send(client, topic, data, extra, payload_id, item, msg)
 
             await asyncio.gather(*[asyncio.ensure_future(_work(item)) for item in items])
 
