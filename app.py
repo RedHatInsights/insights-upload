@@ -689,10 +689,10 @@ endpoints = [
     (config.API_PREFIX + "/v1/version", VersionHandler),
     (config.API_PREFIX + "/v1/upload", UploadHandler),
     (config.API_PREFIX + "/v1/openapi.json", SpecHandler),
-    (r"/r/insights/platform/upload", RootHandler),
-    (r"/r/insights/platform/upload/api/v1/version", VersionHandler),
-    (r"/r/insights/platform/upload/api/v1/upload", UploadHandler),
-    (r"/r/insights/platform/upload/api/v1/openapi.json", SpecHandler),
+    (r"/r/insights/platform/ingress", RootHandler),
+    (r"/r/insights/platform/ingress/v1/version", VersionHandler),
+    (r"/r/insights/platform/ingress/v1/upload", UploadHandler),
+    (r"/r/insights/platform/ingress/v1/openapi.json", SpecHandler),
     (r"/metrics", MetricsHandler)
 ]
 
