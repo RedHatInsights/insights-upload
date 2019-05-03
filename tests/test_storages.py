@@ -79,7 +79,7 @@ class TestS3(object):
         assert file_url is not None
         assert isinstance(ls_response, dict)
 
-        assert ls_response['ContentLength'] == os.stat(local_file).st_size
+        assert ls_response['ContentLength'] == len(local_file)
         assert ls_response['ResponseMetadata']['HTTPStatusCode'] == 200
 
     def test_up_check(self, s3_mocked):
