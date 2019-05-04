@@ -208,7 +208,7 @@ def make_preprocessor(queue=None):
                     return
 
                 logger.info(
-                    "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: {}".format(msg),
+                    "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]",
                     len(queue), topic, payload_id, extra=extra)
 
                 try:
@@ -241,9 +241,9 @@ async def handle_file(msg):
     try:
         with mnm.uploads_json_loads.labels(key="handle_file").time():
             data = json.loads(msg.value)
-        logger.debug("handling_data: {}".format(data), extra=extra)
+        logger.debug("handling_data", extra=extra)
     except Exception:
-        logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value), extra=extra)
+        logger.error("handle_file(): unable to decode msg as json", extra=extra)
         return
 
     if 'payload_id' not in data and 'hash' not in data:
