@@ -81,7 +81,10 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
                                                  log_group="platform",
                                                  stream_name=NAMESPACE)
     cw_handler.setFormatter(LogstashFormatterV1())
-    logging.root.addHandler(cw_handler)
+    logger.addHandler(cw_handler)
+    for l in other_loggers:
+        l.addHandler(cw_handler)
+
 
 if not config.DEVMODE:
     VALID_TOPICS = config.get_valid_topics()
@@ -205,8 +208,8 @@ def make_preprocessor(queue=None):
                     return
 
                 logger.info(
-                    "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: %s",
-                    len(queue), topic, payload_id, msg, extra=extra)
+                    "Popped data from produce queue (qsize now: %d) for topic [%s], payload_id [%s]: {}".format(msg),
+                    len(queue), topic, payload_id, extra=extra)
 
                 try:
                     with mnm.uploads_json_dumps.labels(key="send_to_preprocessors").time():
@@ -238,7 +241,7 @@ async def handle_file(msg):
     try:
         with mnm.uploads_json_loads.labels(key="handle_file").time():
             data = json.loads(msg.value)
-        logger.debug("handling_data: %s", data, extra=extra)
+        logger.debug("handling_data: {}".format(data), extra=extra)
     except Exception:
         logger.error("handle_file(): unable to decode msg as json: {}".format(msg.value), extra=extra)
         return
@@ -282,7 +285,7 @@ async def handle_file(msg):
             logger.info(
                 "data for topic [%s], payload_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
                 data['topic'], payload_id, data["msg"].get("id"), len(produce_queue), extra=extra)
-            logger.debug("payload_id [%s] data: %s", payload_id, data, extra=extra)
+            logger.debug("payload_id [%s] data: {}".format(data), payload_id, extra=extra)
         elif result.lower() == 'failure':
             mnm.uploads_invalidated.inc()
             logger.info('payload_id [%s] rejected', payload_id, extra=extra)
