@@ -257,45 +257,40 @@ async def handle_file(msg):
 
     logger.info('processing message: payload [%s] - %s', payload_id, result, extra=extra)
 
-    r = await defer(storage.ls, storage.PERM, payload_id)
+    if result.lower() == 'success':
+        mnm.uploads_validated.inc()
 
-    if r['ResponseMetadata']['HTTPStatusCode'] == 200:
-        if result.lower() == 'success':
-            mnm.uploads_validated.inc()
-
-            url = await defer(storage.get_url, storage.PERM, payload_id)
-            data = {
-                'topic': 'platform.upload.available',
-                'msg': {
-                    'id': data.get('id'),
-                    'url': url,
-                    'service': data.get('service'),
-                    'payload_id': payload_id,
-                    'account': account,
-                    'principal': data.get('principal'),
-                    'b64_identity': data.get('b64_identity'),
-                    'satellite_managed': data.get('satellite_managed'),
-                    'rh_account': account,  # deprecated key, temp for backward compatibility
-                    'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
-                }
+        url = await defer(storage.get_url, storage.PERM, payload_id)
+        data = {
+            'topic': 'platform.upload.available',
+            'msg': {
+                'id': data.get('id'),
+                'url': url,
+                'service': data.get('service'),
+                'payload_id': payload_id,
+                'account': account,
+                'principal': data.get('principal'),
+                'b64_identity': data.get('b64_identity'),
+                'satellite_managed': data.get('satellite_managed'),
+                'rh_account': account,  # deprecated key, temp for backward compatibility
+                'rh_principal': data.get('principal'),  # deprecated key, temp for backward compatibility
             }
-            mnm.uploads_produced_to_topic.labels(topic="platform.upload.available").inc()
-            produce_queue.append(data)
-            logger.info(
-                "data for topic [%s], payload_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
-                data['topic'], payload_id, data["msg"].get("id"), len(produce_queue), extra=extra)
-            logger.debug("payload_id [%s] data: {}".format(data), payload_id, extra=extra)
-        elif result.lower() == 'failure':
-            mnm.uploads_invalidated.inc()
-            logger.info('payload_id [%s] rejected', payload_id, extra=extra)
-            url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, account)
-        elif result.lower() == 'handoff':
-            mnm.uploads_handed_off.inc()
-            logger.info('payload_id [%s] handed off', payload_id, extra=extra)
-        else:
-            logger.info('Unrecognized result: %s', result.lower(), extra=extra)
+        }
+        mnm.uploads_produced_to_topic.labels(topic="platform.upload.available").inc()
+        produce_queue.append(data)
+        logger.info(
+            "data for topic [%s], payload_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
+            data['topic'], payload_id, data["msg"].get("id"), len(produce_queue), extra=extra)
+        logger.debug("payload_id [%s] data: {}".format(data), payload_id, extra=extra)
+    elif result.lower() == 'failure':
+        mnm.uploads_invalidated.inc()
+        logger.info('payload_id [%s] rejected', payload_id, extra=extra)
+        url = await defer(storage.copy, storage.PERM, storage.REJECT, payload_id, account)
+    elif result.lower() == 'handoff':
+        mnm.uploads_handed_off.inc()
+        logger.info('payload_id [%s] handed off', payload_id, extra=extra)
     else:
-        logger.info('payload_id [%s] no longer in permanent bucket', payload_id, extra=extra)
+        logger.info('Unrecognized result: %s', result.lower(), extra=extra)
 
 
 class NoAccessLog(tornado.web.RequestHandler):
