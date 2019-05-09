@@ -193,6 +193,7 @@ def make_preprocessor(queue=None):
             try:
                 items = list(queue)
                 queue.clear()
+                current_archives.clear()
             except Exception:
                 logger.exception("Failed to popleft", extra=extra)
                 return
