@@ -176,6 +176,7 @@ def make_preprocessor(queue=None):
             await client.send_and_wait(topic, data.encode("utf-8"))
         except KafkaError:
             queue.append(item)
+            current_archives.append(payload_id)
             logger.error(
                 "send data for topic [%s] with payload_id [%s] failed, put back on queue (qsize now: %d)",
                 topic, payload_id, len(queue), extra=extra)
@@ -278,6 +279,7 @@ async def handle_file(msg):
             }
             mnm.uploads_produced_to_topic.labels(topic="platform.upload.available").inc()
             produce_queue.append(data)
+            current_archives.append(payload_id)
             logger.info(
                 "data for topic [%s], payload_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
                 data['topic'], payload_id, data["msg"].get("id"), len(produce_queue), extra=extra)
