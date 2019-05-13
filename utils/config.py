@@ -25,8 +25,6 @@ MAX_WORKERS = int(os.getenv('MAX_WORKERS', 50))
 # Maximum time to wait for an archive to upload to storage
 STORAGE_UPLOAD_TIMEOUT = int(os.getenv('STORAGE_UPLOAD_TIMEOUT', 60))
 
-DEVMODE = os.getenv('DEV', False)
-
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
 
 STORAGE_DRIVER = os.getenv("STORAGE_DRIVER", "s3")
@@ -97,14 +95,23 @@ def get_namespace():
 
 def get_valid_topics():
     VALID_TOPICS = []
-    with open(TOPIC_CONFIG, 'r') as f:
-        data = f.read().replace("'", '"')
-        topic_config = json.loads(data)
+    try:
+        with open(TOPIC_CONFIG, 'r') as f:
+            data = f.read().replace("'", '"')
+            topic_config = json.loads(data)
 
-    for topic in topic_config:
-        for name in topic['TOPIC_NAME'].split('.'):
-            VALID_TOPICS.append(name)
-    return VALID_TOPICS
+        for topic in topic_config:
+            for name in topic['TOPIC_NAME'].split('.'):
+                VALID_TOPICS.append(name)
+        return VALID_TOPICS
+    except Exception:
+        logger.exception("Unable to open topics.json. Using default topics")
+        VALID_TOPICS = [{"TOPIC NAME": "platform.upload.validation"},
+                        {"TOPIC NAME": "platform.upload.testareno"},
+                        {"TOPIC NAME": "platform.upload.hccm"},
+                        {"TOPIC NAME": "platform.upload.compliance"},
+                        {"TOPIC NAME": "platform.upload.qpc"}]
+        return VALID_TOPICS
 
 
 def get_commit_date(commit_id):
@@ -113,6 +120,11 @@ def get_commit_date(commit_id):
     else:
         headers = {}
     BASE_URL = "https://api.github.com/repos/RedHatInsights/insights-upload/git/commits/"
-    response = requests.get(BASE_URL + commit_id, headers=headers)
-    date = response.json()['committer']['date']
+    try:
+        response = requests.get(BASE_URL + commit_id, headers=headers)
+        date = response.json()['committer']['date']
+    except Exception:
+        logger.exception("Unable to get commit date")
+        date = "unknown"
+
     return date
