@@ -85,9 +85,7 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     for l in other_loggers:
         l.addHandler(cw_handler)
 
-
-if not config.DEVMODE:
-    VALID_TOPICS = config.get_valid_topics()
+VALID_TOPICS = config.get_valid_topics()
 
 # Set Storage driver to use
 storage = import_module("utils.storage.{}".format(config.STORAGE_DRIVER))
@@ -101,6 +99,8 @@ kafka_producer = AIOKafkaProducer(loop=IOLoop.current().asyncio_loop, bootstrap_
                                   request_timeout_ms=10000, connections_max_idle_ms=None)
 CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
 PRODUCER = ReconnectingClient(kafka_producer, "producer")
+
+BUILD_DATE = config.get_commit_date(config.BUILD_ID)
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque()
@@ -124,13 +124,7 @@ async def defer(*args):
         return await IOLoop.current().run_in_executor(None, *args)
 
 
-if config.DEVMODE:
-    BUILD_DATE = 'devmode'
-else:
-    BUILD_DATE = config.get_commit_date(config.BUILD_ID)
-
-
-def prepare_facts_for_inventory(facts):
+def clean_up_metadata(facts):
     """
     Empty values need to be stripped from metadata prior to posting to inventory.
     Display_name must be greater than 1 and less than 200 characters.
@@ -410,8 +404,8 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_unsupported_filetype.inc()
             logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.request_id, extra=extra)
             return self.error(415, 'Unsupported Media Type', **extra)
-        if not config.DEVMODE and serv_dict["service"] not in VALID_TOPICS:
-            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.request_id, extra=extra)
+        if serv_dict["service"] not in VALID_TOPICS:
+            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
             return self.error(415, 'Unsupported MIME type', **extra)
 
     def get(self):
