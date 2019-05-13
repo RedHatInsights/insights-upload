@@ -84,8 +84,6 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
     for l in other_loggers:
         l.addHandler(cw_handler)
 
-VALID_TOPICS = config.get_valid_topics()
-
 # Set Storage driver to use
 storage = import_module("utils.storage.{}".format(config.STORAGE_DRIVER))
 
@@ -98,8 +96,6 @@ kafka_producer = AIOKafkaProducer(loop=IOLoop.current().asyncio_loop, bootstrap_
                                   request_timeout_ms=10000, connections_max_idle_ms=None)
 CONSUMER = ReconnectingClient(kafka_consumer, "consumer")
 PRODUCER = ReconnectingClient(kafka_producer, "producer")
-
-BUILD_DATE = config.get_commit_date(config.BUILD_ID)
 
 # local queue for pushing items into kafka, this queue fills up if kafka goes down
 produce_queue = collections.deque()
@@ -363,7 +359,7 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_unsupported_filetype.inc()
             logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
             return self.error(415, 'Unsupported Media Type', **extra)
-        if serv_dict["service"] not in VALID_TOPICS:
+        if serv_dict["service"] not in config.VALID_TOPICS:
             logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
             return self.error(415, 'Unsupported MIME type', **extra)
 
@@ -601,7 +597,7 @@ class VersionHandler(tornado.web.RequestHandler):
                                     example: '2019-03-19T14:17:27Z'
         """
         response = {'commit': config.BUILD_ID,
-                    'date': BUILD_DATE}
+                    'date': config.get_commit_date(config.BUILD_ID)}
         self.write(response)
 
 

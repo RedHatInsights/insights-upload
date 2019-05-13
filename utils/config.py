@@ -106,11 +106,12 @@ def get_valid_topics():
         return VALID_TOPICS
     except Exception:
         logger.exception("Unable to open topics.json. Using default topics")
-        VALID_TOPICS = [{"TOPIC NAME": "platform.upload.validation"},
-                        {"TOPIC NAME": "platform.upload.testareno"},
-                        {"TOPIC NAME": "platform.upload.hccm"},
-                        {"TOPIC NAME": "platform.upload.compliance"},
-                        {"TOPIC NAME": "platform.upload.qpc"}]
+        VALID_TOPICS = ["advisor",
+                        "validation",
+                        "testareno",
+                        "hccm",
+                        "compliance",
+                        "qpc"]
         return VALID_TOPICS
 
 
@@ -128,3 +129,6 @@ def get_commit_date(commit_id):
         date = "unknown"
 
     return date
+
+
+VALID_TOPICS = get_valid_topics()
