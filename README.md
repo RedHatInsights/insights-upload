@@ -40,15 +40,14 @@ queue.
 
 The message from the upload service is JSON as seen below:
 
-    {'account': '123456', 'rh_account': '123456', 'principal': 'test_org', 'payload_id': '52df9f748eabcfea', 'hash': '52df9f748eabcfea', 'size': 356, 'service': 'testareno', 'b64_identity': '<identity header base64 string>', 'metadata': {'some_key': 'some_value', 'some_other_key': 'some_other_value'}, 'url': '/tmp/uploads/insights-upload-quarantine/52df9f748eabcfea'}
+    {'account': '123456', 'rh_account': '123456', 'principal': 'test_org', 'request_id': '52df9f748eabcfea', 'size': 356, 'service': 'testareno', 'b64_identity': '<identity header base64 string>', 'metadata': {'some_key': 'some_value', 'some_other_key': 'some_other_value'}, 'url': '/tmp/uploads/insights-upload-quarantine/52df9f748eabcfea'}
 
 Fields:
 
   - account: The account number used to upload. Can be used to separate data for tenancy purposes.
   - rh_account: legacy support for the above value. To be deprecated
   - principal:  The uploading org id
-  - payload_id: Unique ID provided to the payload created by 3Scale. This ID will be used for the life of the object.
-  - hash:       Legacy key name. Provides the same UID as payload_id. Will be deprecated.
+  - request_id: Unique ID provided to the payload created by 3Scale. This ID will be used for the life of the object.
   - size:       Size of the payload in bytes
   - service:    The name of the service to do the validation
   - b64_identity: The base64 string from `x-rh-identity` header
@@ -56,7 +55,7 @@ Fields:
   - url:        URL for the location the payload can be downloaded from
 
 Principal is currently reflecting the org_id of the account, though that may change
-as we understand what is most useful regarding who uploaded a particular archive. The payload_id
+as we understand what is most useful regarding who uploaded a particular archive. The request_id
 is a unique ID assigned to the uploaded file by the 3Scale gateway. Everything else
 is fairly self-explanatory.
 
@@ -64,11 +63,11 @@ Service should return most of the same data that was received with the addition 
 
 This is what a message with **minimum** required data should look like:
 
-    {'payload_id': '52df9f748eabcfea', 'service': 'advisor', 'validation': 'success'} # or 'validation': 'failure'
+    {'request_id': '52df9f748eabcfea', 'service': 'advisor', 'validation': 'success'} # or 'validation': 'failure'
 
 Fields:
 
-  - payload_id: Unique ID being addresed by validation message
+  - request_id: Unique ID being addresed by validation message
   - service: The service that performed the validation
   - validation: Either succes or failure based on whether the payload passed validation or not
 
