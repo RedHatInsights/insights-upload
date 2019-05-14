@@ -268,6 +268,7 @@ async def handle_file(msg):
                     'url': await defer(storage.get_url, storage.PERM, request_id),
                     'service': data.get('service'),
                     'request_id': request_id,
+                    'payload_id': request_id,
                     'account': account,
                     'principal': data.get('principal'),
                     'b64_identity': data.get('b64_identity'),
@@ -444,6 +445,7 @@ class UploadHandler(tornado.web.RequestHandler):
             values['account'] = config.DUMMY_VALUES['account']
             values['principal'] = config.DUMMY_VALUES['principal']
         values['request_id'] = self.request_id
+        values['payload_id'] = self.request_id
         values['size'] = self.size
         values['service'] = self.service
         values['category'] = self.category
