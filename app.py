@@ -108,6 +108,8 @@ mnm.uploads_executor_qsize.set_function(lambda: thread_pool_executor._work_queue
 LOOPS = {}
 current_archives = []
 
+VALID_TOPICS = config.get_valid_topics()
+BUILD_DATE = config.get_commit_date(config.BUILD_ID)
 
 async def defer(*args):
     try:
@@ -341,6 +343,10 @@ class RootHandler(NoAccessLog):
 class UploadHandler(tornado.web.RequestHandler):
     """Handles requests to the upload endpoint
     """
+
+    def initialize(self, valid_topics):
+        self.valid_topics = valid_topics
+
     def upload_validation(self):
         """Validate the upload using general criteria
 
@@ -359,7 +365,7 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_unsupported_filetype.inc()
             logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
             return self.error(415, 'Unsupported Media Type', **extra)
-        if serv_dict["service"] not in config.VALID_TOPICS:
+        if serv_dict["service"] not in self.valid_topics:
             logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
             return self.error(415, 'Unsupported MIME type', **extra)
 
@@ -576,6 +582,9 @@ class UploadHandler(tornado.web.RequestHandler):
 class VersionHandler(tornado.web.RequestHandler):
     """Handler for the `version` endpoint
     """
+    def initialize(self, build_id, build_date):
+        self.build_date = build_date
+        self.build_id = build_id
 
     def get(self):
         """Handle GET request to the `version` endpoint
@@ -596,8 +605,8 @@ class VersionHandler(tornado.web.RequestHandler):
                                     type: string
                                     example: '2019-03-19T14:17:27Z'
         """
-        response = {'commit': config.BUILD_ID,
-                    'date': config.get_commit_date(config.BUILD_ID)}
+        response = {'commit': self.build_id,
+                    'date': self.build_date}
         self.write(response)
 
 
@@ -635,15 +644,16 @@ class SpecHandler(tornado.web.RequestHandler):
         response = config.spec.to_dict()
         self.write(response)
 
-
 endpoints = [
     (config.API_PREFIX, RootHandler),
-    (config.API_PREFIX + "/v1/version", VersionHandler),
-    (config.API_PREFIX + "/v1/upload", UploadHandler),
+    (config.API_PREFIX + "/v1/version", VersionHandler, dict(build_id=config.BUILD_ID,
+                                                             build_date=BUILD_DATE)),
+    (config.API_PREFIX + "/v1/upload", UploadHandler, dict(valid_topics=VALID_TOPICS)),
     (config.API_PREFIX + "/v1/openapi.json", SpecHandler),
     (r"/r/insights/platform/ingress", RootHandler),
-    (r"/r/insights/platform/ingress/v1/version", VersionHandler),
-    (r"/r/insights/platform/ingress/v1/upload", UploadHandler),
+    (r"/r/insights/platform/ingress/v1/version", VersionHandler, dict(build_id=config.BUILD_ID,
+                                                                      build_date=BUILD_DATE)),
+    (r"/r/insights/platform/ingress/v1/upload", UploadHandler, dict(valid_topics=VALID_TOPICS)),
     (r"/r/insights/platform/ingress/v1/openapi.json", SpecHandler),
     (r"/metrics", MetricsHandler)
 ]

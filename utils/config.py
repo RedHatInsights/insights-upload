@@ -129,6 +129,3 @@ def get_commit_date(commit_id):
         date = "unknown"
 
     return date
-
-
-VALID_TOPICS = get_valid_topics()
