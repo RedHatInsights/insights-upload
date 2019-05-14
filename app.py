@@ -510,7 +510,7 @@ class UploadHandler(tornado.web.RequestHandler):
                 description: Upload field not found
         """
         mnm.uploads_total.inc()
-        self.payload_id = self.request.headers.get('x-rh-insights-request-id', uuid.uuid4().hex)
+        self.payload_id = self.request.headers.get('x-rh-insights-request-id', "00000" + uuid.uuid4().hex)
         self.account = "unknown"
 
         # is this really ok to be optional?
@@ -553,6 +553,9 @@ class UploadHandler(tornado.web.RequestHandler):
             body = self.payload_data['body']
 
             self.filedata = body
+
+            if self.payload_id[:5] == "00000":
+                self.set_header("x-rh-insights-request-id", self.payload_id)
 
             self.set_status(202, "Accepted")
 
