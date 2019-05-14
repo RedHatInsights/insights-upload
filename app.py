@@ -111,6 +111,7 @@ current_archives = []
 VALID_TOPICS = config.get_valid_topics()
 BUILD_DATE = config.get_commit_date(config.BUILD_ID)
 
+
 async def defer(*args):
     try:
         name = args[0].__name__
@@ -643,6 +644,7 @@ class SpecHandler(tornado.web.RequestHandler):
         """
         response = config.spec.to_dict()
         self.write(response)
+
 
 endpoints = [
     (config.API_PREFIX, RootHandler),
