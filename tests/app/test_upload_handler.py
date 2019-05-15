@@ -28,16 +28,18 @@ class TestUpload(AsyncHTTPTestCase):
         """
         return app
 
+    @patch("app.UploadHandler.initialize")
     @patch("app.UploadHandler.process_upload", wraps=process_upload)  # Must be an async method.
     @patch("app.os.remove")
     @patch("app.logger")
     @patch("utils.storage.localdisk.open")
     @patch("utils.storage.localdisk.os.path.isdir", return_value=True)
+    @patch("app.VALID_TOPICS")
     @patch("app.UploadHandler.write_data", return_value="some_file.tgz")
     @patch("app.UploadHandler.upload_validation", return_value=False)
     @patch("app.storage", localdisk)
     @gen_test
-    def test_localdisk_write_does_not_fail(self, isdir, open_mock, logger, remove, process_upload, write_data, upload_validation):
+    def test_localdisk_write_does_not_fail(self, initialize, isdir, open_mock, logger, remove, process_upload, write_data, upload_validation, VALID_TOPICS):
         """
         Calling localdisk.write method does not fail when everything goes right, correct number of values is returned.
         """
@@ -50,6 +52,7 @@ class TestUpload(AsyncHTTPTestCase):
                                       "x-rh-identity": "eyJpZGVudGl0eSI6eyJhY2NvdW50X251bWJlciI6IjAwMDAwMDEifX0="},
                           "body_arguments": {"metadata": [b'{"machine_id": "12345"}']}})
         handler = UploadHandler(app, request)
+        handler.initialize(valid_topics=VALID_TOPICS)
 
         yield handler.post()
 
@@ -64,11 +67,13 @@ class TestPost(AsyncHTTPTestCase):
         """
         return app
 
+    @patch("app.UploadHandler.initialize")
     @patch("app.UploadHandler.process_upload", wraps=process_upload)  # Must be an async method.
     @patch("app.UploadHandler.write_data", return_value="some_file.tgz")
     @patch("app.UploadHandler.upload_validation", return_value=False)
+    @patch("app.VALID_TOPICS")
     @gen_test
-    def test_indentity_default_value(self, upload_validation, write_data, process_upload):
+    def test_indentity_default_value(self, initialize, upload_validation, write_data, process_upload, VALID_TOPICS):
         size = 123
         request = Mock(**{"files": {"upload": [{"content_type": "application/vnd.redhat.testareno.something+tgz",
                                                 "body": ""}]},
@@ -77,6 +82,7 @@ class TestPost(AsyncHTTPTestCase):
                                       "x-rh-identity": "eyJpZGVudGl0eSI6eyJhY2NvdW50X251bWJlciI6IjAwMDAwMDEifX0="},
                           "body_arguments": {"metadata": [b'{"machine_id": "12345"}']}})
         handler = UploadHandler(app, request)
+        handler.initialize(valid_topics=VALID_TOPICS)
 
         yield handler.post()
 
