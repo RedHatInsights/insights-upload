@@ -78,7 +78,7 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
                          aws_secret_access_key=config.CW_AWS_SECRET_ACCESS_KEY,
                          region_name=config.CW_AWS_REGION_NAME)
     cw_handler = watchtower.CloudWatchLogHandler(boto3_session=CW_SESSION,
-                                                 log_group="platform",
+                                                 log_group=config.LOG_GROUP,
                                                  stream_name=NAMESPACE)
     cw_handler.setFormatter(LogstashFormatterV1())
     logger.addHandler(cw_handler)
