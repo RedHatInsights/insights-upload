@@ -42,6 +42,8 @@ BUILD_ID = os.getenv('OPENSHIFT_BUILD_COMMIT', '8d06f664a88253c361e61af5a4fa2ac5
 TOPIC_CONFIG = os.getenv('TOPIC_CONFIG', '/tmp/topics.json')
 MAX_RECORDS = int(os.getenv("MAX_RECORDS", 1))
 
+LOG_GROUP = os.getenv("LOG_GROUP", "platform")
+
 # Items in this map are _special cases_ where the service cannot be extracted
 # from the Content-Type
 SERVICE_MAP = {
