@@ -77,16 +77,12 @@ if (config.CW_AWS_ACCESS_KEY_ID and config.CW_AWS_SECRET_ACCESS_KEY):
                          aws_secret_access_key=config.CW_AWS_SECRET_ACCESS_KEY,
                          region_name=config.CW_AWS_REGION_NAME)
     cw_handler = watchtower.CloudWatchLogHandler(boto3_session=CW_SESSION,
-                                                 log_group="platform",
+                                                 log_group=config.LOG_GROUP,
                                                  stream_name=NAMESPACE)
     cw_handler.setFormatter(LogstashFormatterV1())
     logger.addHandler(cw_handler)
     for l in other_loggers:
         l.addHandler(cw_handler)
-
-
-if not config.DEVMODE:
-    VALID_TOPICS = config.get_valid_topics()
 
 # Set Storage driver to use
 storage = import_module("utils.storage.{}".format(config.STORAGE_DRIVER))
@@ -112,6 +108,9 @@ mnm.uploads_executor_qsize.set_function(lambda: thread_pool_executor._work_queue
 LOOPS = {}
 current_archives = []
 
+VALID_TOPICS = config.get_valid_topics()
+BUILD_DATE = config.get_commit_date(config.BUILD_ID)
+
 
 async def defer(*args):
     try:
@@ -121,12 +120,6 @@ async def defer(*args):
 
     with mnm.uploads_run_in_executor.labels(function=name).time():
         return await IOLoop.current().run_in_executor(None, *args)
-
-
-if config.DEVMODE:
-    BUILD_DATE = 'devmode'
-else:
-    BUILD_DATE = config.get_commit_date(config.BUILD_ID)
 
 
 def clean_up_metadata(facts):
@@ -351,6 +344,10 @@ class RootHandler(NoAccessLog):
 class UploadHandler(tornado.web.RequestHandler):
     """Handles requests to the upload endpoint
     """
+
+    def initialize(self, valid_topics):
+        self.valid_topics = valid_topics
+
     def upload_validation(self):
         """Validate the upload using general criteria
 
@@ -369,7 +366,7 @@ class UploadHandler(tornado.web.RequestHandler):
             mnm.uploads_unsupported_filetype.inc()
             logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
             return self.error(415, 'Unsupported Media Type', **extra)
-        if not config.DEVMODE and serv_dict["service"] not in VALID_TOPICS:
+        if serv_dict["service"] not in self.valid_topics:
             logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
             return self.error(415, 'Unsupported MIME type', **extra)
 
@@ -589,6 +586,9 @@ class UploadHandler(tornado.web.RequestHandler):
 class VersionHandler(tornado.web.RequestHandler):
     """Handler for the `version` endpoint
     """
+    def initialize(self, build_id, build_date):
+        self.build_date = build_date
+        self.build_id = build_id
 
     def get(self):
         """Handle GET request to the `version` endpoint
@@ -609,8 +609,8 @@ class VersionHandler(tornado.web.RequestHandler):
                                     type: string
                                     example: '2019-03-19T14:17:27Z'
         """
-        response = {'commit': config.BUILD_ID,
-                    'date': BUILD_DATE}
+        response = {'commit': self.build_id,
+                    'date': self.build_date}
         self.write(response)
 
 
@@ -651,12 +651,14 @@ class SpecHandler(tornado.web.RequestHandler):
 
 endpoints = [
     (config.API_PREFIX, RootHandler),
-    (config.API_PREFIX + "/v1/version", VersionHandler),
-    (config.API_PREFIX + "/v1/upload", UploadHandler),
+    (config.API_PREFIX + "/v1/version", VersionHandler, dict(build_id=config.BUILD_ID,
+                                                             build_date=BUILD_DATE)),
+    (config.API_PREFIX + "/v1/upload", UploadHandler, dict(valid_topics=VALID_TOPICS)),
     (config.API_PREFIX + "/v1/openapi.json", SpecHandler),
     (r"/r/insights/platform/ingress", RootHandler),
-    (r"/r/insights/platform/ingress/v1/version", VersionHandler),
-    (r"/r/insights/platform/ingress/v1/upload", UploadHandler),
+    (r"/r/insights/platform/ingress/v1/version", VersionHandler, dict(build_id=config.BUILD_ID,
+                                                                      build_date=BUILD_DATE)),
+    (r"/r/insights/platform/ingress/v1/upload", UploadHandler, dict(valid_topics=VALID_TOPICS)),
     (r"/r/insights/platform/ingress/v1/openapi.json", SpecHandler),
     (r"/metrics", MetricsHandler)
 ]
