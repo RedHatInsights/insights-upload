@@ -238,11 +238,11 @@ async def handle_file(msg):
         logger.error("handle_file(): unable to decode msg as json", extra=extra)
         return
 
-    if 'request_id' not in data and 'hash' not in data:
+    if 'request_id' not in data and 'payload_id' not in data:
         logger.error("request_id or hash not in message. Payload not removed from permanent.", extra=extra)
         return
 
-    request_id = data['request_id']
+    request_id = data['request_id'] if data.get('request_id') else data['payload_id']
     extra["request_id"] = request_id
     extra["account"] = account = data.get('account', 'unknown')
     result = data.get('validation', 'unknown')
