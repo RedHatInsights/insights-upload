@@ -165,6 +165,7 @@ def make_preprocessor(queue=None):
     async def send(client, topic, data, extra, request_id, item, msg):
         try:
             await client.send_and_wait(topic, data.encode("utf-8"))
+            logger.info("send data for topic [%s] with request_id [%s] succeeded", topic, request_id, extra=extra)
         except KafkaError:
             queue.append(item)
             current_archives.append(request_id)
