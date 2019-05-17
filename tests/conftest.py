@@ -174,7 +174,7 @@ def broker_stage_messages(s3_mocked, produce_queue_mocked):
             'account': config.DUMMY_VALUES['account'],
             'principal': config.DUMMY_VALUES['principal'],
             'validation': validation,
-            'payload_id': file_name,
+            'request_id': file_name,
             'size': 100,
             'service': service,
             'url': file_path
