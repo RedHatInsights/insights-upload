@@ -552,8 +552,8 @@ class UploadHandler(tornado.web.RequestHandler):
 
             self.filedata = body
 
-            if self.payload_id[:5] == "00000":
-                self.set_header("x-rh-insights-request-id", self.payload_id)
+            if self.request_id[:5] == "00000":
+                self.set_header("x-rh-insights-request-id", self.request_id)
 
             self.set_status(202, "Accepted")
 
