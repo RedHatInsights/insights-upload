@@ -2,8 +2,6 @@ import hashlib
 import os
 import uuid
 from mock import patch
-from random import randint
-from string import ascii_letters, digits
 
 import pytest
 import responses
@@ -93,42 +91,67 @@ class TestS3(object):
 
 
 class TestLocalDisk(object):
-
-    @staticmethod
-    def _get_file_data():
-        return ''.join([(ascii_letters + digits)[randint(0, 61)] for _ in range(100)])
-
     def setup_method(self):
         self.temp_file_name = uuid.uuid4().hex
         self.non_existing_folder = 'some-random-folder'
 
-    def test_write(self, with_local_folders):
-        file_name = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
+    def test_write(self, with_local_folders, local_file):
+        file_name = local_storage.write(
+            local_file,
+            local_storage.PERM,
+            self.temp_file_name,
+            config.DUMMY_VALUES['account'],
+            "curl/7.61.1"
+        )
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
 
-    def test_write_wrong_destination(self, with_local_folders):
+    def test_write_wrong_destination(self, with_local_folders, local_file):
         with pytest.raises(FileNotFoundError):
-            local_storage.write(self._get_file_data(), self.non_existing_folder, self.temp_file_name)
+            local_storage.write(
+                local_file,
+                self.non_existing_folder,
+                self.temp_file_name,
+                config.DUMMY_VALUES['account'],
+                "curl/7.61.1"
+            )
 
-    def test_write_no_folders_at_all(self, no_local_folders):
-        file_name = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
+    def test_write_no_folders_at_all(self, no_local_folders, local_file):
+        file_name = local_storage.write(
+            local_file,
+            local_storage.PERM,
+            self.temp_file_name,
+            config.DUMMY_VALUES['account'],
+            "curl/7.61.1"
+        )
 
         assert self.temp_file_name == os.path.basename(file_name)
         assert os.path.isfile(file_name)
 
     @patch("utils.storage.localdisk.open")
     @patch("utils.storage.localdisk.os.path.isdir", return_value=True)
-    def test_write_return(self, isdir, open_mock):
+    def test_write_return(self, isdir, open_mock, local_file):
         """
         Write method returns a file name
         """
-        result = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
+        result = local_storage.write(
+            local_file,
+            local_storage.PERM,
+            self.temp_file_name,
+            config.DUMMY_VALUES['account'],
+            "curl/7.61.1"
+        )
         assert result == open_mock.return_value.__enter__.return_value.name
 
-    def test_ls(self, with_local_folders):
-        local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
+    def test_ls(self, with_local_folders, local_file):
+        local_storage.write(
+            local_file,
+            local_storage.PERM,
+            self.temp_file_name,
+            config.DUMMY_VALUES['account'],
+            "curl/7.61.1"
+        )
         assert local_storage.ls(local_storage.PERM, self.temp_file_name) is True
 
     def test_ls_file_not_found(self, with_local_folders):
@@ -141,8 +164,14 @@ class TestLocalDisk(object):
         for _dir in local_storage.dirs:
             assert os.path.isdir(_dir) is True
 
-    def test_copy(self, with_local_folders):
-        original_file_path = local_storage.write(self._get_file_data(), local_storage.PERM, self.temp_file_name)
+    def test_copy(self, with_local_folders, local_file):
+        original_file_path = local_storage.write(
+            local_file,
+            local_storage.PERM,
+            self.temp_file_name,
+            config.DUMMY_VALUES['account'],
+            "curl/7.61.1"
+        )
 
         original_file = open(original_file_path, 'rb')
         original_checksum = hashlib.md5(original_file.read()).hexdigest()
