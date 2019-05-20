@@ -6,6 +6,7 @@ import sh
 
 import pytest
 import requests
+import responses
 from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.testing import AsyncHTTPTestCase, gen_test
 from unittest import TestCase
@@ -183,6 +184,47 @@ class TestUploadHandler(AsyncHTTPTestCase):
 
         self.assertEqual(response.exception.code, 415)
         self.assertEqual(response.exception.message, 'Unsupported MIME type')
+
+
+class TestInventoryPost(object):
+
+    @asyncio.coroutine
+    @responses.activate
+    @patch("utils.config.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
+    def test_post_to_inventory_success(self):
+        values = {"account": "12345", "metadata": {"some_key": "some_value"}}
+        responses.add(responses.POST, config.INVENTORY_URL,
+                      json={"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}, status=207)
+        method_response = app.post_to_inventory('1234', 'abcd1234', values)
+
+        assert method_response == "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"
+        assert len(responses.calls) == 1
+        assert responses.calls[0].response.text == '{"data": [{"host": {"id": "4f81c749-e6e6-46a7-ba3f-e755001ba5ee"}, "status": 200}]}'
+
+    @asyncio.coroutine
+    @responses.activate
+    @patch("utils.config.INVENTORY_URL", "http://fakeinventory.com/api/inventory/v1/hosts")
+    def test_post_to_inventory_fail(self):
+        values = {"account": "12345", "metadata": {"bad_key": "bad_value"}}
+        responses.add(responses.POST, config.INVENTORY_URL,
+                      json={"data": [{"detail": "boop", "status": 400}]}, status=207)
+        method_response = app.post_to_inventory('1234', 'abcd1234', values)
+
+        assert method_response is None
+        assert len(responses.calls) == 1
+        assert responses.calls[0].response.text == '{"data": [{"detail": "boop", "status": 400}]}'
+
+    def test_strip_empty_key_before_post_to_inventory(self):
+        values = {"account": "12345", "metadata": {"empty_key": [], "non_empty_key": "non_empty_value"}}
+        stripped_metadata = app.prepare_facts_for_inventory(values["metadata"])
+
+        assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
+
+    def test_strip_invalid_display_name_small(self):
+        values = {"account": "12345", "metadata": {"display_name": "a", "non_empty_key": "non_empty_value"}}
+        stripped_metadata = app.prepare_facts_for_inventory(values["metadata"])
+
+        assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
 
 
 class TestProducerAndConsumer:
