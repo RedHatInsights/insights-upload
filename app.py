@@ -17,6 +17,7 @@ from time import time, sleep
 
 import tornado.ioloop
 import tornado.web
+from tornado.httpclient import AsyncHTTPClient, HTTPClientError
 from tornado.ioloop import IOLoop
 from kafkahelpers import ReconnectingClient
 
@@ -136,6 +137,20 @@ def clean_up_metadata(facts):
     return defined_facts
 
 
+def prepare_facts_for_inventory(facts):
+    """
+    Empty values need to be stripped from metadata prior to posting to inventory.
+    Display_name must be greater than 1 and less than 200 characters.
+    """
+    defined_facts = {}
+    for fact in facts:
+        if facts[fact]:
+            defined_facts.update({fact: facts[fact]})
+    if 'display_name' in defined_facts and len(defined_facts['display_name']) not in range(2, 200):
+        defined_facts.pop('display_name')
+    return defined_facts
+
+
 def get_service(content_type):
     """
     Returns the service that content_type maps to.
@@ -147,6 +162,46 @@ def get_service(content_type):
         if m:
             return m.groupdict()
     raise Exception("Could not resolve a service from the given content_type")
+
+
+async def post_to_inventory(identity, values, extra):
+    request_id = extra["request_id"]
+    account = extra["account"]
+
+    headers = {'x-rh-identity': identity,
+               'Content-Type': 'application/json',
+               'x-rh-insights-request-id': request_id,
+               }
+    post = prepare_facts_for_inventory(values['metadata'])
+    post['account'] = account
+
+    with mnm.uploads_json_dumps.labels(key="post_to_inventory").time():
+        post = json.dumps([post])
+    try:
+        httpclient = AsyncHTTPClient()
+        with mnm.uploads_httpclient_fetch_seconds.labels(url=config.INVENTORY_URL).time():
+            response = await httpclient.fetch(config.INVENTORY_URL, body=post, headers=headers, method="POST")
+        with mnm.uploads_json_loads.labels(key="post_to_inventory").time():
+            body = json.loads(response.body)
+        if response.code != 207:
+            mnm.uploads_inventory_post_failure.inc()
+            error = body.get('detail')
+            logger.error('Failed to post to inventory: %s', error, extra=extra)
+            logger.debug('Host data that failed to post: %s' % post, extra=extra)
+            return None
+        elif body['data'][0]['status'] != 200 and body['data'][0]['status'] != 201:
+            mnm.uploads_inventory_post_failure.inc()
+            error = body['data'][0].get('detail')
+            logger.error('Failed to post to inventory: ' + error, extra=extra)
+            logger.debug('Host data that failed to post: %s' % post, extra=extra)
+            return None
+        else:
+            mnm.uploads_inventory_post_success.inc()
+            inv_id = body['data'][0]['host']['id']
+            logger.info('Payload [%s] posted to inventory. ID [%s]', request_id, inv_id, extra={"id": inv_id, **extra})
+            return inv_id
+    except HTTPClientError:
+        logger.exception("Unable to contact inventory", extra=extra)
 
 
 async def handle_validation(client):
@@ -451,6 +506,8 @@ class UploadHandler(tornado.web.RequestHandler):
         if self.metadata:
             with mnm.uploads_json_loads.labels(key="process_upload").time():
                 values['metadata'] = clean_up_metadata(json.loads(self.metadata))
+            values['id'] = await post_to_inventory(self.b64_identity, values, extra)
+            del values['metadata']
 
         url = await self.upload(self.filedata, self.request_id, self.identity)
 
