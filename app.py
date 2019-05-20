@@ -405,7 +405,7 @@ class UploadHandler(tornado.web.RequestHandler):
             logger.exception("Unsupported Media Type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.request_id, extra=extra)
             return self.error(415, 'Unsupported Media Type', **extra)
         if serv_dict["service"] not in VALID_TOPICS:
-            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.payload_id, extra=extra)
+            logger.error("Unsupported MIME type: [%s] - Request-ID [%s]", self.payload_data['content_type'], self.request_id, extra=extra)
             return self.error(415, 'Unsupported MIME type', **extra)
 
     def get(self):
