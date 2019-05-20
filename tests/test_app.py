@@ -216,14 +216,12 @@ class TestInventoryPost(object):
 
     def test_strip_empty_key_before_post_to_inventory(self):
         values = {"account": "12345", "metadata": {"empty_key": [], "non_empty_key": "non_empty_value"}}
-        stripped_metadata = app.prepare_facts_for_inventory(values["metadata"])
-
+        stripped_metadata = app.clean_up_metadata(values["metadata"])
         assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
 
     def test_strip_invalid_display_name_small(self):
         values = {"account": "12345", "metadata": {"display_name": "a", "non_empty_key": "non_empty_value"}}
-        stripped_metadata = app.prepare_facts_for_inventory(values["metadata"])
-
+        stripped_metadata = app.clean_up_metadata(values["metadata"])
         assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
 
 
@@ -276,7 +274,7 @@ class TestProducerAndConsumer:
                 produced_messages.append(message)
 
             for m in produced_messages:
-                assert s3_storage.ls(s3_storage.PERM, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
+                assert s3_storage.ls(s3_storage.PERM, m['request_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert mq.produce_calls_count == total_messages
             assert mq.count_topic_messages(topic) == total_messages
@@ -286,7 +284,7 @@ class TestProducerAndConsumer:
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
-                assert s3_storage.ls(s3_storage.PERM, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
+                assert s3_storage.ls(s3_storage.PERM, m['request_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert mq.consume_calls_count > 0
             assert mq.consume_return_messages_count == 1
@@ -321,8 +319,8 @@ class TestProducerAndConsumer:
             event_loop.run_until_complete(self.coroutine_test(consumer))
 
             for m in produced_messages:
-                assert s3_storage.ls(s3_storage.PERM, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 404
-                assert s3_storage.ls(s3_storage.REJECT, m['payload_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
+                assert s3_storage.ls(s3_storage.PERM, m['request_id'])['ResponseMetadata']['HTTPStatusCode'] == 404
+                assert s3_storage.ls(s3_storage.REJECT, m['request_id'])['ResponseMetadata']['HTTPStatusCode'] == 200
 
             assert mq.consume_calls_count > 0
             assert mq.consume_return_messages_count == 1
