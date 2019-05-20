@@ -13,7 +13,7 @@ def stage():
         os.makedirs(dir_, exist_ok=True)
 
 
-def write(data, dest, uuid):
+def write(data, dest, uuid, account, user_agent):
     dir_path = os.path.join(WORKDIR, dest)
     if dir_path in dirs and not os.path.isdir(dir_path):
         stage()
