@@ -217,13 +217,11 @@ class TestInventoryPost(object):
     def test_strip_empty_key_before_post_to_inventory(self):
         values = {"account": "12345", "metadata": {"empty_key": [], "non_empty_key": "non_empty_value"}}
         stripped_metadata = app.clean_up_metadata(values["metadata"])
-
         assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
 
     def test_strip_invalid_display_name_small(self):
         values = {"account": "12345", "metadata": {"display_name": "a", "non_empty_key": "non_empty_value"}}
         stripped_metadata = app.clean_up_metadata(values["metadata"])
-
         assert stripped_metadata == {'non_empty_key': 'non_empty_value'}
 
 
