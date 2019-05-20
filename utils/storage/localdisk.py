@@ -32,3 +32,7 @@ def copy(src, dest, uuid):
     os.rename(os.path.join(WORKDIR, src, uuid),
               os.path.join(WORKDIR, dest, uuid))
     return os.path.join(WORKDIR, dest, uuid)
+
+
+def get_url(bucket, uuid):
+    return "file://" + os.path.join(WORKDIR, bucket, uuid)
