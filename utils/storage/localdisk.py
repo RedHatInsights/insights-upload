@@ -17,7 +17,7 @@ def write(data, dest, uuid, account, user_agent):
     dir_path = os.path.join(WORKDIR, dest)
     if dir_path in dirs and not os.path.isdir(dir_path):
         stage()
-    with open(os.path.join(dir_path, uuid), 'w') as f:
+    with open(os.path.join(dir_path, uuid), 'wb') as f:
         f.write(data)
         url = f
     return url.name
