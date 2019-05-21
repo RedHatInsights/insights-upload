@@ -540,7 +540,6 @@ class UploadHandler(tornado.web.RequestHandler):
             with mnm.uploads_json_loads.labels(key="process_upload").time():
                 values['metadata'] = clean_up_metadata(json.loads(self.metadata))
             values['id'] = await post_to_inventory(self.b64_identity, values, extra)
-            del values['metadata']
 
         url = await self.upload(self.filedata, self.request_id, self.identity)
 
