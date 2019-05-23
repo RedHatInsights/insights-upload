@@ -105,8 +105,8 @@ def get_valid_topics():
             topic_config = json.loads(data)
 
         for topic in topic_config:
-            for name in topic['TOPIC_NAME'].split('.'):
-                VALID_TOPICS.append(name)
+            name = topic['TOPIC_NAME'].split('.')[-1]
+            VALID_TOPICS.append(name)
         return VALID_TOPICS
     except Exception:
         logger.exception("Unable to open topics.json. Using default topics")
