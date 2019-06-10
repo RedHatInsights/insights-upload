@@ -720,7 +720,8 @@ endpoints = [
 for urlSpec in endpoints:
     config.spec.path(urlspec=urlSpec)
 
-app = tornado.web.Application(endpoints, max_body_size=config.MAX_LENGTH)
+app = tornado.web.Application(endpoints, max_body_size=config.MAX_LENGTH,
+                              max_buffer_size=config.MAX_LENGTH + 500)
 
 
 def signal_handler(signal, frame):
