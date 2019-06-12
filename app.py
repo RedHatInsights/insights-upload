@@ -23,7 +23,7 @@ from kafkahelpers import ReconnectingClient
 
 from aiokafka import AIOKafkaConsumer, AIOKafkaProducer
 from kafka.errors import KafkaError
-from utils import mnm, config
+from utils import mnm, config, tracker
 from logstash_formatter import LogstashFormatterV1
 from prometheus_async.aio import time as prom_time
 from boto3.session import Session
@@ -309,6 +309,9 @@ async def handle_file(msg):
 
     if result.lower() == 'success':
         mnm.uploads_validated.inc()
+        produce_queue.append(tracker.payload_tracker(request_id, account,
+                                                     "successful",
+                                                     "Validation response recieved by Ingress"))
         try:
             data = {
                 'topic': 'platform.upload.available',
@@ -333,10 +336,16 @@ async def handle_file(msg):
                 "data for topic [%s], request_id [%s], inv_id [%s] put on produce queue (qsize now: %d)",
                 data['topic'], request_id, data["msg"].get("id"), len(produce_queue), extra=extra)
             logger.debug("request_id [%s] data: {}".format(data), request_id, extra=extra)
+            produce_queue.append(tracker.payload_tracker(request_id, account,
+                                                         "advertised",
+                                                         "Upload has been advertised to platform apps"))
         except Exception:
             logger.exception("Failure while handling success.", extra=extra)
     elif result.lower() == 'failure':
         mnm.uploads_invalidated.inc()
+        produce_queue.append(tracker.payload_tracker(request_id, account,
+                                                     "rejected",
+                                                     "Upload rejected by validating service"))
         logger.info('request_id [%s] rejected', request_id, extra=extra)
         try:
             await defer(storage.copy, storage.PERM, storage.REJECT, request_id, account)
@@ -488,6 +497,9 @@ class UploadHandler(tornado.web.RequestHandler):
         Write to storage, send message to MQ
         """
         extra = get_extra(account=self.account, request_id=self.request_id)
+        produce_queue.append(tracker.payload_tracker(self.request_id, self.account,
+                                                     "Processing",
+                                                     "Upload being processed by Ingress"))
         values = {}
         # use dummy values for now if no account given
         if self.identity:
@@ -609,6 +621,9 @@ class UploadHandler(tornado.web.RequestHandler):
             self.filedata = body
 
             self.set_status(202, "Accepted")
+            produce_queue.append(tracker.payload_tracker(self.request_id, self.account,
+                                                         "recieved",
+                                                         "Upload recieved by ingress service"))
 
             # Offload the handling of the upload and producing to kafka
             asyncio.ensure_future(

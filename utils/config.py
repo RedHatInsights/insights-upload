@@ -26,6 +26,7 @@ MAX_WORKERS = int(os.getenv('MAX_WORKERS', 50))
 STORAGE_UPLOAD_TIMEOUT = int(os.getenv('STORAGE_UPLOAD_TIMEOUT', 60))
 
 VALIDATION_QUEUE = os.getenv('VALIDATION_QUEUE', 'platform.upload.validation')
+TRACKER_TOPIC = os.getenv("TRACKER_TOPIC", "platform.payload-status")
 
 INVENTORY_URL = os.getenv('INVENTORY_URL', 'http://inventory:8080/api/hosts')
 
