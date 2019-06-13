@@ -498,7 +498,7 @@ class UploadHandler(tornado.web.RequestHandler):
         """
         extra = get_extra(account=self.account, request_id=self.request_id)
         produce_queue.append(tracker.payload_tracker(self.request_id, self.account,
-                                                     "Processing",
+                                                     "processing",
                                                      "Upload being processed by Ingress"))
         values = {}
         # use dummy values for now if no account given
@@ -622,8 +622,8 @@ class UploadHandler(tornado.web.RequestHandler):
 
             self.set_status(202, "Accepted")
             produce_queue.append(tracker.payload_tracker(self.request_id, self.account,
-                                                         "recieved",
-                                                         "Upload recieved by ingress service"))
+                                                         "received",
+                                                         "Upload received by ingress service"))
 
             # Offload the handling of the upload and producing to kafka
             asyncio.ensure_future(
