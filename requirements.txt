@@ -72,3 +72,4 @@ websocket-client==0.54.0
 Werkzeug==0.14.1
 wrapt==1.10.11
 xmltodict==0.11.0
+freezegun
