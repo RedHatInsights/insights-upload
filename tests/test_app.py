@@ -294,7 +294,7 @@ class TestProducerAndConsumer:
             assert mq.count_topic_messages(topic) == 0
             assert mq.disconnect_in_operation_called is False
             assert mq.trying_to_connect_failures_calls == 0
-            assert len(app.produce_queue) == 4
+            assert len(app.produce_queue) == 12
 
     def test_consumer_with_validation_failure(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
@@ -330,7 +330,7 @@ class TestProducerAndConsumer:
             assert mq.count_topic_messages(topic) == 0
             assert mq.disconnect_in_operation_called is False
             assert mq.trying_to_connect_failures_calls == 0
-            assert len(app.produce_queue) == 0
+            assert len(app.produce_queue) == 4
 
     def test_consumer_with_validation_unknown(self, local_file, s3_mocked, broker_stage_messages, event_loop):
 
@@ -412,7 +412,7 @@ class TestProducerAndConsumer:
             assert mq.count_topic_messages(topic) == 0
             assert mq.disconnect_in_operation_called is True
             assert mq.trying_to_connect_failures_calls == 1
-            assert len(app.produce_queue) == 4
+            assert len(app.produce_queue) == 12
 
 
 cleanup()
