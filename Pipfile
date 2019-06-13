@@ -13,6 +13,7 @@ moto = "*"
 responses = "*"
 sh = "*"
 pytest-cov = "*"
+freezegun = "*"
 
 [packages]
 tornado = "*"
