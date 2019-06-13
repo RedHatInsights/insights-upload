@@ -2,6 +2,8 @@ import datetime
 
 from utils import config
 
+def get_time():
+    return str(datetime.datetime.now())
 
 def payload_tracker(request_id, account, status, status_msg):
 
@@ -16,7 +18,7 @@ def payload_tracker(request_id, account, status, status_msg):
         "payload_id": request_id,
     }
 
-    payload_status["date"] = str(datetime.datetime.now())
+    payload_status["date"] = get_time()
 
     payload_msg["msg"] = payload_status
 
