@@ -1,7 +1,7 @@
-import json
 import datetime
 
 from utils import config
+
 
 def payload_tracker(request_id, account, status, status_msg):
 
