@@ -1,5 +1,3 @@
-import pytest
-
 from utils import tracker
 
 from unittest import TestCase
