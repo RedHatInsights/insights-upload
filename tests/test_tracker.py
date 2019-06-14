@@ -6,7 +6,7 @@ from freezegun import freeze_time
 
 class TestTrackerMessage(TestCase):
 
-    @freeze_time("2019-06-13- 09:30:54.233478")
+    @freeze_time("2019-06-14T08:36:30.050513")
     def test_payload_tracker(self):
 
         topic = "platform.payload-status"

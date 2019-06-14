@@ -4,7 +4,7 @@ from utils import config
 
 
 def get_time():
-    return str(datetime.datetime.now())
+    return datetime.datetime.now().isoformat()
 
 
 def payload_tracker(request_id, account, status, status_msg):
